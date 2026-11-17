@@ -1,5 +1,5 @@
 [build]
-  command = "GOOS=js GOARCH=wasm go build -tags='release' -o web/games.wasm . && npm install -g wabt && npx -p wabt wasm-strip web/games.wasm"
+  command = "GOOS=js GOARCH=wasm go build -tags 'release no_emoji' -ldflags="-s -w" -o web/games.wasm ."
   publish = "web"
 
 [build.environment]
