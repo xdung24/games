@@ -111,8 +111,9 @@ func TestScreenPreservesGameWhenHidden(t *testing.T) {
 		t.Fatal("reopening the game must preserve paused progress")
 	}
 	game.TogglePause()
+	game.leftHeld, game.rightHeld = true, true
 	screen.Pause()
-	if game.state != StatePaused {
-		t.Fatal("losing foreground must pause the game")
+	if game.state != StatePaused || game.leftHeld || game.rightHeld {
+		t.Fatal("losing foreground must pause the game and release held controls")
 	}
 }

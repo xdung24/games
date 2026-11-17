@@ -9,6 +9,7 @@ import (
 	brickbreaker "github.com/xdung24/games/brickbreaker"
 	flappybird "github.com/xdung24/games/flappybird"
 	flappygophy "github.com/xdung24/games/flappygophy"
+	browserinput "github.com/xdung24/games/internal/browserinput"
 	starbreaker "github.com/xdung24/games/starbreaker"
 )
 
@@ -45,6 +46,7 @@ func main() {
 	var flappyScreen *flappybird.Screen
 	var gophyScreen *flappygophy.Screen
 	showMenu := func() {
+		browserinput.Show("")
 		a.Settings().SetTheme(brickbreaker.NewTheme())
 		w.SetTitle("Play game")
 		menu.Show(w)
@@ -56,6 +58,7 @@ func main() {
 			description: "Keep the ball in play and break the ocean-blue blocks.",
 			icon:        fyne.NewStaticResource("brick-breaker-Icon.png", brickBreakerIconPNG),
 			play: func() {
+				browserinput.Show("")
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Brick Breaker")
 				if brickScreen == nil {
@@ -69,6 +72,7 @@ func main() {
 			description: "Destroy the stars and reach the highest score.",
 			icon:        fyne.NewStaticResource("star-breaker-Icon.png", starBreakerIconPNG),
 			play: func() {
+				browserinput.Show("starbreaker")
 				a.Settings().SetTheme(starbreaker.NewTheme())
 				w.SetTitle("Star Breaker")
 				if starScreen == nil {
@@ -82,6 +86,7 @@ func main() {
 			description: "Tap to flap, slip through the pipes, and beat your best score.",
 			icon:        flappybird.Icon,
 			play: func() {
+				browserinput.Show("")
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Flappy Bird")
 				if flappyScreen == nil {
@@ -95,6 +100,7 @@ func main() {
 			description: "Guide a hyperactive Gopher through the pipes.",
 			icon:        fyne.NewStaticResource("flappy-gophy-Icon.png", flappyGophyIconPNG),
 			play: func() {
+				browserinput.Show("")
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Flappy Gophy")
 				if gophyScreen == nil {

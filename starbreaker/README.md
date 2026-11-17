@@ -18,6 +18,9 @@ hunting saucer, and clear wave after escalating wave.
 | `M` | Mute / unmute (remembered between runs) |
 
 A tap or click also starts the game and fires.
+The custom browser build adds a multi-touch control bar on touch-capable
+devices. Hold Left/Right, Thrust, and Fire simultaneously to steer and shoot;
+Jump, Pause, Restart, and Mute have their own buttons below the playfield.
 Select the small back arrow beside **SCORE** to return to the launcher.
 Your session is paused and preserved;
 opening Star Breaker again restores it. Run `go run .` from the repository root,

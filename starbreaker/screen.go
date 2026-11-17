@@ -1,9 +1,13 @@
 package starbreaker
 
 import (
+	"image/color"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
+	"github.com/xdung24/games/internal/browserinput"
 )
 
 // Screen owns a game session and preserves its progress between menu visits.
@@ -28,6 +32,11 @@ func NewScreen(w fyne.Window, preferences fyne.Preferences, onBack func()) *Scre
 		return muted
 	}
 	s := &Screen{window: w, game: game, board: board, content: board}
+	if height := browserinput.ControlsHeight(); height > 0 {
+		space := canvas.NewRectangle(color.Transparent)
+		space.SetMinSize(fyne.NewSize(0, height))
+		s.content = container.NewBorder(nil, space, nil, nil, board)
+	}
 	board.onBack = func() {
 		s.Hide()
 		onBack()

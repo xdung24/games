@@ -85,6 +85,7 @@ func (s *Screen) Show() {
 // Pause freezes play when the application leaves the foreground.
 func (s *Screen) Pause() {
 	s.game.Pause()
+	s.board.FocusLost()
 	if s.board.Visible() {
 		s.board.Refresh()
 	}
