@@ -11,16 +11,19 @@ type myTheme struct{}
 
 var _ fyne.Theme = (*myTheme)(nil)
 
-// NewTheme returns the classic gray Minesweeper theme.
+// NewTheme returns the Bombsweeper theme.
 func NewTheme() fyne.Theme {
 	return &myTheme{}
 }
 
 func (m myTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
-	if name == theme.ColorNameBackground {
-		return color.NRGBA{R: 192, G: 192, B: 192, A: 255}
+	switch name {
+	case theme.ColorNameBackground, theme.ColorNameMenuBackground:
+		return color.NRGBA{R: 210, G: 190, B: 159, A: 255}
+	case theme.ColorNameForeground:
+		return color.NRGBA{A: 255}
 	}
-	return theme.DefaultTheme().Color(name, variant)
+	return theme.DefaultTheme().Color(name, theme.VariantLight)
 }
 
 func (m myTheme) Font(name fyne.TextStyle) fyne.Resource {

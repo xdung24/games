@@ -4,30 +4,37 @@ import (
 	"time"
 )
 
-func (g *Game) startTimer() {
+func (g *Game) startTimer(counter *TimeCounter, stop <-chan struct{}) {
 	for i := 0; i < 999; i++ {
 		if !g.IsRunning {
 			break
 		}
-		g.TimeCounter.Increment()
-		time.Sleep(1 * time.Second)
+		select {
+		case <-stop:
+			return
+		default:
+		}
+		counter.Increment()
+		select {
+		case <-stop:
+			return
+		case <-time.After(time.Second):
+		}
 	}
-	return
 }
 
 func (g *Game) openTile(row, col int) {
 	if g.OpenCount == 0 {
-		go g.startTimer()
+		go g.startTimer(g.TimeCounter, g.timerStop)
 	}
 
 	switch g.Tiles[row][col].Base {
 	case TileTypeMine:
 		g.Tiles[row][col].Open(true)
 		g.lose()
-		break
 	case TileType0:
 		g.revealEdges(row, col)
-		break
+
 	default:
 		g.Tiles[row][col].Open(true)
 		g.OpenCount++
@@ -35,7 +42,6 @@ func (g *Game) openTile(row, col int) {
 	if g.OpenCount == g.WinCount {
 		g.win()
 	}
-	return
 }
 
 func (g *Game) markTile(row, col int) {
@@ -96,5 +102,4 @@ func (g *Game) revealEdges(row, col int) {
 	g.revealEdges(row+1, col-1)
 	g.revealEdges(row+1, col)
 	g.revealEdges(row+1, col+1)
-	return
 }

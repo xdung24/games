@@ -6,6 +6,10 @@ Choose a game to see a brief loading screen with its icon and an animated
 indicator before it opens. The indicator respects the system animation setting.
 Returning Home preserves your game progress and menu selection.
 
+The game menu uses each game's platform settings for the build target.
+Browser builds use the web setting even on mobile devices. Bombsweeper is
+currently available only in desktop builds.
+
 ## Play in desktop
 
 To build a standalone binary:

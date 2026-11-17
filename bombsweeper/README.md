@@ -3,9 +3,11 @@ A clone of the popular game - "Minesweeper", made using the [Fyne toolkit](https
 
 ### Features
 * Create a game with Beginner, Intermediate or Expert difficulty
+* Choose Game > New Game to restart at the current difficulty
+* Scroll in either direction when the board is larger than the window
 * Left click to reveal a tile, right click to flag it
 * Counter on the left counts the number of mines remaining (unflagged)
-* Counter on the right tracks the time sincethe start of the game
+* Counter on the right tracks the time since the start of the game
 * Smiley-man in the center controls everything :)
 
 ### Cell artwork

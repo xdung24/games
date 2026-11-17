@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -15,6 +16,64 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
+
+func TestGamesForPlatform(t *testing.T) {
+	entries := []gameEntry{
+		{name: "desktop", isDesktop: true},
+		{name: "mobile", isMobile: true},
+		{name: "web", isWeb: true},
+		{name: "all", isDesktop: true, isMobile: true, isWeb: true},
+		{name: "none"},
+	}
+	for _, tt := range []struct {
+		targetOS string
+		want     []string
+	}{
+		{"windows", []string{"desktop", "all"}},
+		{"linux", []string{"desktop", "all"}},
+		{"darwin", []string{"desktop", "all"}},
+		{"android", []string{"mobile", "all"}},
+		{"ios", []string{"mobile", "all"}},
+		{"js", []string{"web", "all"}},
+	} {
+		t.Run(tt.targetOS, func(t *testing.T) {
+			var names []string
+			for _, entry := range gamesForPlatform(entries, tt.targetOS) {
+				names = append(names, entry.name)
+			}
+			if !slices.Equal(names, tt.want) {
+				t.Fatalf("available games = %v, want %v", names, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfiguredGamesForPlatform(t *testing.T) {
+	app := test.NewApp()
+	defer app.Quit()
+	window := test.NewWindow(nil)
+	defer window.Close()
+	for _, tt := range []struct {
+		targetOS string
+		want     []string
+	}{
+		{"windows", []string{"Asteroid Shooter", "Brick Breaker", "Bombsweeper", "Flappy Chick", "Flappy Gophy"}},
+		{"android", []string{"Asteroid Shooter", "Brick Breaker", "Flappy Chick", "Flappy Gophy"}},
+		{"ios", []string{"Asteroid Shooter", "Brick Breaker", "Flappy Chick", "Flappy Gophy"}},
+		{"js", []string{"Asteroid Shooter", "Brick Breaker", "Flappy Chick", "Flappy Gophy"}},
+	} {
+		t.Run(tt.targetOS, func(t *testing.T) {
+			entries, _ := newGameEntries(app, window, func() {}, tt.targetOS)
+			var names []string
+			for _, entry := range entries {
+				names = append(names, entry.name)
+			}
+			if !slices.Equal(names, tt.want) {
+				t.Fatalf("available games = %v, want %v", names, tt.want)
+			}
+		})
+	}
+}
 
 func TestGameMenuKeyboardNavigation(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

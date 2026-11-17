@@ -53,6 +53,8 @@ type Game struct {
 	Size      Size
 
 	Win fyne.Window
+
+	timerStop chan struct{}
 }
 
 // NewGame creates a new game
@@ -62,6 +64,11 @@ func NewGame() *Game {
 
 // SeedGame creates a new game damnit
 func (g *Game) SeedGame(size Size) {
+	if g.timerStop != nil {
+		close(g.timerStop)
+	}
+	g.timerStop = make(chan struct{})
+
 	plan := make([][]int, 0)
 
 	// generate a blank plan
@@ -85,35 +92,26 @@ func (g *Game) SeedGame(size Size) {
 			switch plan[itrRow][itrCol] {
 			case -1:
 				tile = NewTile(TileTypeMine, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 0:
 				tile = NewTile(TileType0, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 1:
 				tile = NewTile(TileType1, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 2:
 				tile = NewTile(TileType2, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 3:
 				tile = NewTile(TileType3, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 4:
 				tile = NewTile(TileType4, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 5:
 				tile = NewTile(TileType5, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 6:
 				tile = NewTile(TileType6, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 7:
 				tile = NewTile(TileType7, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			case 8:
 				tile = NewTile(TileType8, itrRow, itrCol, g.openTile, g.markTile)
-				break
 			default:
+				tile = NewTile(TileType0, itrRow, itrCol, g.openTile, g.markTile)
 			}
 
 			row = append(row, tile)
@@ -190,15 +188,7 @@ func (g *Game) Render() {
 	tc := container.NewCenter(g.TimeCounter.Container)
 	topBar := container.NewBorder(nil, nil, mc, tc, g.Smiley)
 	t := container.NewVBox(topBar, g.Board)
-	content := container.NewCenter(t)
-	minSize := content.MinSize()
-	currentSize := g.Win.Canvas().Size()
-
-	g.Win.SetContent(content)
-	g.Win.Resize(fyne.NewSize(
-		max(minSize.Width, currentSize.Width),
-		max(minSize.Height, currentSize.Height),
-	))
+	g.Win.SetContent(container.NewScroll(container.NewCenter(t)))
 }
 
 func (g *Game) resetHandler() {

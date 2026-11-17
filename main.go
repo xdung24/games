@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"runtime"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -41,10 +42,13 @@ type gameEntry struct {
 	name        string
 	description string
 	icon        fyne.Resource
+	isDesktop   bool
+	isMobile    bool
+	isWeb       bool
 	play        func()
 }
 
-func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, func()) {
+func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string) ([]gameEntry, func()) {
 	var brickScreen *brickbreaker.Screen
 	var asteroidshooterScreen *asteroidshooter.Screen
 	var flappyScreen *flappychick.Screen
@@ -53,8 +57,11 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, fu
 	entries := []gameEntry{
 		{
 			name:        "Asteroid Shooter",
-			description: "Destroy the stars and reach the highest score.",
+			description: "Destroy the asteroids and reach the highest score.",
 			icon:        asteroidShooterIcon,
+			isDesktop:   true,
+			isMobile:    true,
+			isWeb:       true,
 			play: func() {
 				a.Settings().SetTheme(asteroidshooter.NewTheme())
 				w.SetTitle("Asteroid Shooter")
@@ -68,6 +75,9 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, fu
 			name:        "Brick Breaker",
 			description: "Keep the ball in play and break the ocean-blue blocks.",
 			icon:        brickBreakerIcon,
+			isDesktop:   true,
+			isMobile:    true,
+			isWeb:       true,
 			play: func() {
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Brick Breaker")
@@ -79,8 +89,11 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, fu
 		},
 		{
 			name:        "Bombsweeper",
-			description: "Clear the board without uncovering a mine.",
+			description: "Clear the board without uncovering bombs.",
 			icon:        bombsweeperIcon,
+			isDesktop:   true,
+			isMobile:    false,
+			isWeb:       false,
 			play: func() {
 				a.Settings().SetTheme(bombsweeper.NewTheme())
 				w.SetTitle("Bombsweeper")
@@ -98,8 +111,11 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, fu
 			name:        "Flappy Chick",
 			description: "Tap to flap, slip through the pipes, and beat your best score.",
 			icon:        flappyChickIcon,
+			isDesktop:   true,
+			isMobile:    true,
+			isWeb:       true,
 			play: func() {
-				a.Settings().SetTheme(brickbreaker.NewTheme())
+				a.Settings().SetTheme(flappychick.NewTheme())
 				w.SetTitle("Flappy Chick")
 				if flappyScreen == nil {
 					flappyScreen = flappychick.NewScreen(w, a.Preferences(), showMenu)
@@ -111,6 +127,9 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, fu
 			name:        "Flappy Gophy",
 			description: "Guide a hyperactive Gopher through the pipes.",
 			icon:        flappyGophyIcon,
+			isDesktop:   true,
+			isMobile:    true,
+			isWeb:       true,
 			play: func() {
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Flappy Gophy")
@@ -137,7 +156,26 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, fu
 		}
 	}
 
-	return entries, pauseGames
+	return gamesForPlatform(entries, targetOS), pauseGames
+}
+
+func gamesForPlatform(entries []gameEntry, targetOS string) []gameEntry {
+	available := make([]gameEntry, 0, len(entries))
+	for _, entry := range entries {
+		var supported bool
+		switch targetOS {
+		case "js":
+			supported = entry.isWeb
+		case "android", "ios":
+			supported = entry.isMobile
+		default:
+			supported = entry.isDesktop
+		}
+		if supported {
+			available = append(available, entry)
+		}
+	}
+	return available
 }
 
 func main() {
@@ -149,12 +187,12 @@ func main() {
 	var menu *gameMenu
 	showMenu := func() {
 		a.Settings().SetTheme(brickbreaker.NewTheme())
-		w.SetTitle("Play game")
+		w.SetTitle("Let's play game")
 		w.SetMainMenu(nil)
 		menu.Show(w)
 	}
 
-	entries, pauseGames := newGameEntries(a, w, showMenu)
+	entries, pauseGames := newGameEntries(a, w, showMenu, runtime.GOOS)
 	menu = newGameMenu(entries)
 
 	w.Resize(fyne.NewSize(640, 600))

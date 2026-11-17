@@ -1,4 +1,4 @@
-# Starbreaker
+# Asteroid Shooter
 
 A neon vector take on the arcade classic **Asteroids**, built with [Fyne](https://fyne.io).
 Drift through a glowing nebula, blast the rocks into ever-smaller pieces, dodge the
@@ -13,7 +13,6 @@ hunting saucer, and clear wave after escalating wave.
 | `Space` | Fire · start · play again |
 | `P` | Pause / resume |
 | `Esc`, then `Esc` again | Pause, then return to the Home menu |
-| `R` | Restart |
 | `M` | Mute / unmute (remembered between runs) |
 
 A tap or click also starts the game and fires.

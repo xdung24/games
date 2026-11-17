@@ -5,6 +5,7 @@ import (
 )
 
 func NewMenuBar(g *Game, onBack func()) *fyne.MainMenu {
+	miNewGame := fyne.NewMenuItem("New Game", g.resetHandler)
 	miHome := fyne.NewMenuItem("Home", onBack)
 	miSizeBeginner := fyne.NewMenuItem("Beginner", func() {
 		g.SeedGame(SizeBeginner)
@@ -19,7 +20,7 @@ func NewMenuBar(g *Game, onBack func()) *fyne.MainMenu {
 		g.Render()
 	})
 
-	mGame := fyne.NewMenu("Game", miHome)
+	mGame := fyne.NewMenu("Game", miNewGame, miHome)
 	mDifficulty := fyne.NewMenu("Difficulty", miSizeBeginner, miSizeIntermediate, miSizeExpert)
 	mm := fyne.NewMainMenu(mGame, mDifficulty)
 	return mm

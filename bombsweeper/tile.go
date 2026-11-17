@@ -85,34 +85,29 @@ func (t *Tile) open(byUser bool) {
 	t.IsOpen = true
 }
 
-func getBaseResourceByType(t TileType, byUser bool) fyne.Resource {
-	var res fyne.Resource
+var numberResources = [...]fyne.Resource{
+	resourceType0Png,
+	resourceType1Png,
+	resourceType2Png,
+	resourceType3Png,
+	resourceType4Png,
+	resourceType5Png,
+	resourceType6Png,
+	resourceType7Png,
+	resourceType8Png,
+}
 
-	switch t {
-	case TileTypeMine:
+func getBaseResourceByType(tileType TileType, byUser bool) fyne.Resource {
+	if tileType == TileTypeMine {
 		if byUser {
-			res = resourceMineRedPng
-		} else {
-			res = resourceMinePng
+			return resourceMineRedPng
 		}
-	case TileType0:
-		res = resourceType0Png
-	case TileType1:
-		res = resourceType1Png
-	case TileType2:
-		res = resourceType2Png
-	case TileType3:
-		res = resourceType3Png
-	case TileType4:
-		res = resourceType4Png
-	case TileType5:
-		res = resourceType5Png
-	case TileType6:
-		res = resourceType6Png
-	case TileType7:
-		res = resourceType7Png
-	case TileType8:
-		res = resourceType8Png
+		return resourceMinePng
 	}
-	return res
+
+	if tileType < TileType0 || tileType > TileType8 {
+		return nil
+	}
+
+	return numberResources[tileType-TileType0]
 }

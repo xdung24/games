@@ -54,14 +54,12 @@ func getResourceByGameState(state GameState) fyne.Resource {
 	switch state {
 	case GameStateLose:
 		res = resourceFaceLosePng
-		break
 	case GameStateWin:
 		res = resourceFaceWinPng
-		break
 	case GameStateOngoing:
 		res = resourceFaceUnpressedPng
-		break
 	default:
+		res = resourceFaceUnpressedPng
 	}
 
 	return res
