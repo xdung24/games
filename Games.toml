@@ -2,7 +2,7 @@
 Icon = "Icon.png"
 Name = "game"
 ID = "com.dungle.game"
-Version = "0.0.4"
+Version = "0.0.5"
 Build = 3
 
 [LinuxAndBSD]

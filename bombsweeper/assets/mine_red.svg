@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Creator: CorelDRAW -->
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="40" height="40" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+viewBox="0 0 1193.09 1193.09"
+ xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <radialGradient id="id0" gradientUnits="userSpaceOnUse" cx="565.199" cy="573.107" r="173.093" fx="565.199" fy="573.107">
+   <stop offset="0" style="stop-color:white"/>
+   <stop offset="0.129412" style="stop-color:#E5E5E1"/>
+   <stop offset="0.290196" style="stop-color:#CCC8C8"/>
+   <stop offset="0.439216" style="stop-color:#B2B4B4"/>
+   <stop offset="0.74902" style="stop-color:#464D43"/>
+   <stop offset="1" style="stop-color:black"/>
+  </radialGradient>
+ </defs>
+ <g id="Layer_x0020_1">
+  <metadata id="CorelCorpID_0Corel-Layer"/>
+  <rect fill="gray" width="1193.09" height="1193.09"/>
+  <rect fill="red" x="72.8328" y="72.8328" width="1120.25" height="1120.25"/>
+  <polygon fill="black" stroke="black" stroke-width="3.63653" points="147.337,664.015 140.173,633.171 147.337,601.903 601.903,601.903 601.903,147.337 632.771,141.324 664.015,147.337 664.015,601.903 1118.59,601.903 1123.12,633.1 1118.59,664.015 664.015,664.015 664.015,1118.59 634.47,1123.96 601.903,1118.59 601.903,664.015 "/>
+  <circle fill="black" stroke="black" stroke-width="3.63653" cx="388.583" cy="385.314" r="49.2519"/>
+  <polygon fill="black" stroke="black" stroke-width="3.63653" points="334.322,972.404 307.678,957.262 293.514,931.596 592.153,632.961 293.514,334.327 310.627,308.566 334.322,293.519 632.957,592.153 931.596,293.514 957.405,308.862 972.404,334.322 673.765,632.961 972.404,931.601 958.388,958.168 931.596,972.409 632.957,673.77 "/>
+  <circle fill="black" stroke="black" stroke-width="3.63653" cx="635.521" cy="287.667" r="49.2519"/>
+  <circle fill="url(#id0)" cx="632.961" cy="627.315" r="338.808"/>
+  <circle fill="black" stroke="black" stroke-width="3.63653" cx="867.763" cy="398.509" r="49.2519"/>
+  <circle fill="black" stroke="black" stroke-width="3.63653" cx="396.5" cy="867.669" r="49.2519"/>
+  <circle fill="black" stroke="black" stroke-width="3.63653" cx="867.763" cy="867.669" r="49.2519"/>
+  <circle fill="white" cx="573.307" cy="584.269" r="45.6666"/>
+ </g>
+</svg>
+

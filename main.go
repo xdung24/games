@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	asteroidshooter "github.com/xdung24/games/asteroidshooter"
+	bombsweeper "github.com/xdung24/games/bombsweeper"
 	brickbreaker "github.com/xdung24/games/brickbreaker"
 	flappychick "github.com/xdung24/games/flappychick"
 	flappygophy "github.com/xdung24/games/flappygophy"
@@ -32,6 +33,10 @@ var flappyGophyIcon = fyne.NewStaticResource("flappy-gophy-Icon.png", flappyGoph
 var flappyChickIconPNG []byte
 var flappyChickIcon = fyne.NewStaticResource("flappy-chick-Icon.svg", flappyChickIconPNG)
 
+//go:embed bombsweeper/Icon.png
+var bombsweeperIconPNG []byte
+var bombsweeperIcon = fyne.NewStaticResource("bombsweeper-Icon.png", bombsweeperIconPNG)
+
 type gameEntry struct {
 	name        string
 	description string
@@ -39,24 +44,13 @@ type gameEntry struct {
 	play        func()
 }
 
-func main() {
-	a := app.NewWithID("com.dungle.game")
-	a.Settings().SetTheme(brickbreaker.NewTheme())
-	w := a.NewWindow("game-window")
-	w.SetPadded(false)
-
-	var menu *gameMenu
+func newGameEntries(a fyne.App, w fyne.Window, showMenu func()) ([]gameEntry, func()) {
 	var brickScreen *brickbreaker.Screen
 	var asteroidshooterScreen *asteroidshooter.Screen
 	var flappyScreen *flappychick.Screen
 	var gophyScreen *flappygophy.Screen
-	showMenu := func() {
-		a.Settings().SetTheme(brickbreaker.NewTheme())
-		w.SetTitle("Play game")
-		menu.Show(w)
-	}
 
-	menu = newGameMenu([]gameEntry{
+	entries := []gameEntry{
 		{
 			name:        "Asteroid Shooter",
 			description: "Destroy the stars and reach the highest score.",
@@ -84,6 +78,23 @@ func main() {
 			},
 		},
 		{
+			name:        "Bombsweeper",
+			description: "Clear the board without uncovering a mine.",
+			icon:        bombsweeperIcon,
+			play: func() {
+				a.Settings().SetTheme(bombsweeper.NewTheme())
+				w.SetTitle("Bombsweeper")
+				game := bombsweeper.NewGame()
+				game.Win = w
+				game.SeedGame(bombsweeper.SizeBeginner)
+				w.SetMainMenu(bombsweeper.NewMenuBar(game, func() {
+					game.IsRunning = false
+					showMenu()
+				}))
+				game.Render()
+			},
+		},
+		{
 			name:        "Flappy Chick",
 			description: "Tap to flap, slip through the pipes, and beat your best score.",
 			icon:        flappyChickIcon,
@@ -108,12 +119,10 @@ func main() {
 				}
 				gophyScreen.Show()
 			},
-		}})
+		},
+	}
 
-	w.Resize(fyne.NewSize(640, 600))
-	showMenu()
-
-	a.Lifecycle().SetOnExitedForeground(func() {
+	pauseGames := func() {
 		if asteroidshooterScreen != nil {
 			asteroidshooterScreen.Pause()
 		}
@@ -126,6 +135,33 @@ func main() {
 		if gophyScreen != nil {
 			gophyScreen.Pause()
 		}
+	}
+
+	return entries, pauseGames
+}
+
+func main() {
+	a := app.NewWithID("com.dungle.game")
+	a.Settings().SetTheme(brickbreaker.NewTheme())
+	w := a.NewWindow("game-window")
+	w.SetPadded(false)
+
+	var menu *gameMenu
+	showMenu := func() {
+		a.Settings().SetTheme(brickbreaker.NewTheme())
+		w.SetTitle("Play game")
+		w.SetMainMenu(nil)
+		menu.Show(w)
+	}
+
+	entries, pauseGames := newGameEntries(a, w, showMenu)
+	menu = newGameMenu(entries)
+
+	w.Resize(fyne.NewSize(640, 600))
+	showMenu()
+
+	a.Lifecycle().SetOnExitedForeground(func() {
+		pauseGames()
 	})
 	w.ShowAndRun()
 }

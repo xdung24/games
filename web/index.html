@@ -102,7 +102,7 @@
 								}
 							});
 							observer.observe(document.body, {childList: true, subtree: true});
-							WebAssembly.instantiateStreaming(fetch("games.wasm?v=0.0.4"), go.importObject).then((result) => {
+							WebAssembly.instantiateStreaming(fetch("games.wasm?v=0.0.5"), go.importObject).then((result) => {
 								action.innerHTML = "Starting application.";
 								go.run(result.instance);
 							});
@@ -124,7 +124,7 @@
 			<table class="center">
 				<tr><td><img class="application-icon" src="icon.png" alt="Application icon"/></td></tr>
 				<tr><td><div class="centered-text"><div class="application-name">games</div></div></td></tr>
-				<tr><td><div class="centered-text"><div class="application-version">v0.0.4</div></div></td></tr>
+				<tr><td><div class="centered-text"><div class="application-version">v0.0.5</div></div></td></tr>
 				<tr>
 					<td>
 						<picture>

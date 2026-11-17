@@ -13,7 +13,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-const gamesPerPage = 10
+const gamesPerPage = 4
 
 type paginationTheme struct {
 	fyne.Theme
