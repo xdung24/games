@@ -68,10 +68,12 @@ type Game struct {
 	deathTime time.Time
 	prefs     fyne.Preferences
 
-	raster    *canvas.Raster
-	scoreText *canvas.Text
-	msgText   *canvas.Text
-	subText   *canvas.Text
+	raster     *canvas.Raster
+	background *image.RGBA
+	frameImage *image.RGBA
+	scoreText  *canvas.Text
+	msgText    *canvas.Text
+	subText    *canvas.Text
 }
 
 func NewGame(prefs fyne.Preferences) *Game {
@@ -82,6 +84,9 @@ func NewGame(prefs fyne.Preferences) *Game {
 	}
 
 	g.raster = canvas.NewRaster(g.drawFrame)
+	if fyne.CurrentDevice().IsBrowser() {
+		g.raster.Generator = g.drawWebFrame
+	}
 	g.raster.SetMinSize(fyne.NewSize(gameW, gameH))
 
 	g.scoreText = canvas.NewText("0", color.White)
@@ -227,6 +232,15 @@ func pipeCollides(birdY float64, p Pipe) bool {
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
+func (g *Game) drawWebFrame(w, h int) image.Image {
+	// Bound CPU painting and texture uploads independently of device pixel ratio.
+	if w > gameW || h > gameH {
+		scale := min(gameW/float64(w), gameH/float64(h))
+		w, h = max(1, int(float64(w)*scale)), max(1, int(float64(h)*scale))
+	}
+	return g.drawFrame(w, h)
+}
+
 func (g *Game) drawFrame(w, h int) image.Image {
 	g.mu.Lock()
 	state := g.state
@@ -237,10 +251,39 @@ func (g *Game) drawFrame(w, h int) image.Image {
 	copy(pipes, g.pipes)
 	g.mu.Unlock()
 
-	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	sx, sy := float64(w)/gameW, float64(h)/gameH
 	gndY := int((gameH - groundH) * sy)
 
+	if g.frameImage == nil || g.frameImage.Bounds().Dx() != w || g.frameImage.Bounds().Dy() != h {
+		g.background = image.NewRGBA(image.Rect(0, 0, w, h))
+		g.frameImage = image.NewRGBA(g.background.Bounds())
+		drawSky(g.background, gndY, w)
+		drawGround(g.background, gndY, w, h)
+	}
+	img := g.frameImage
+	copy(img.Pix, g.background.Pix)
+
+	drawClouds(img, w, h, sx, sy)
+	for _, p := range pipes {
+		drawPipe(img, p, sx, sy, gndY, w, h)
+	}
+
+	if state == StateStart {
+		lx := w / 2
+		ly := int(float64(h) * 0.30)
+		lr := max(int(38*math.Min(sx, sy)), 12)
+		drawBird(img, lx, ly, lr, 0, 0, w, h)
+	} else {
+		bx := int(birdX * sx)
+		byPx := int(by * sy)
+		br := max(int(birdRadius*math.Min(sx, sy)), 8)
+		drawBird(img, bx, byPx, br, bvy, ft, w, h)
+	}
+
+	return img
+}
+
+func drawSky(img *image.RGBA, gndY, w int) {
 	// Sky gradient: light-blue top → clear blue → deeper horizon blue.
 	for y := 0; y < gndY; y++ {
 		t := float64(y) / float64(gndY)
@@ -258,32 +301,6 @@ func (g *Game) drawFrame(w, h int) image.Image {
 		}
 	}
 
-	// Clouds (drawn into the sky before ground/pipes).
-	drawClouds(img, w, h, sx, sy)
-
-	// Ground (rocky texture).
-	drawGround(img, gndY, w, h)
-
-	// Pipes.
-	for _, p := range pipes {
-		drawPipe(img, p, sx, sy, gndY, w, h)
-	}
-
-	// Bird / logo.
-	if state == StateStart {
-		// Draw a larger, centred gopher as the title screen logo.
-		lx := w / 2
-		ly := int(float64(h) * 0.30)
-		lr := max(int(38*math.Min(sx, sy)), 12)
-		drawBird(img, lx, ly, lr, 0, 0, w, h)
-	} else {
-		bx := int(birdX * sx)
-		byPx := int(by * sy)
-		br := max(int(birdRadius*math.Min(sx, sy)), 8)
-		drawBird(img, bx, byPx, br, bvy, ft, w, h)
-	}
-
-	return img
 }
 
 func lerp(a, b uint8, t float64) float64 { return float64(a)*(1-t) + float64(b)*t }
@@ -300,7 +317,7 @@ func groundHash(x, y int) int {
 
 // drawGround renders a rocky ledge with horizontal strata, per-pixel grain,
 // a dark shadow lip at the top, and sparse crack pixels.
-func drawGround(img *image.NRGBA, gndY, w, h int) {
+func drawGround(img *image.RGBA, gndY, w, h int) {
 	for y := gndY; y < h; y++ {
 		off := y * img.Stride
 		dy := y - gndY
@@ -331,7 +348,7 @@ func drawGround(img *image.NRGBA, gndY, w, h int) {
 	}
 }
 
-func drawClouds(img *image.NRGBA, w, h int, sx, sy float64) {
+func drawClouds(img *image.RGBA, w, h int, sx, sy float64) {
 	tSec := float64(time.Now().UnixMilli()) * 0.001
 	const cloudMargin = 150
 	const span = float64(gameW + 2*cloudMargin)
@@ -353,7 +370,7 @@ func drawClouds(img *image.NRGBA, w, h int, sx, sy float64) {
 }
 
 // drawCircleAlpha draws a filled circle with alpha blending onto the image.
-func drawCircleAlpha(img *image.NRGBA, cx, cy, r int, cr, cg, cb, ca uint8, W, H int) {
+func drawCircleAlpha(img *image.RGBA, cx, cy, r int, cr, cg, cb, ca uint8, W, H int) {
 	r2 := r * r
 	a := int(ca)
 	inv := 255 - a
@@ -372,7 +389,7 @@ func drawCircleAlpha(img *image.NRGBA, cx, cy, r int, cr, cg, cb, ca uint8, W, H
 	}
 }
 
-func drawPipe(img *image.NRGBA, p Pipe, sx, sy float64, gndY, W, H int) {
+func drawPipe(img *image.RGBA, p Pipe, sx, sy float64, gndY, W, H int) {
 	x1 := int(p.x * sx)
 	x2 := int((p.x + pipeW) * sx)
 	topB := int((p.gapY - pipeGap/2) * sy)
@@ -411,7 +428,7 @@ func drawPipe(img *image.NRGBA, p Pipe, sx, sy float64, gndY, W, H int) {
 	drawRect(img, shcx+sw, botT, shcx+sw*3, botT+capH, hi2, hi2, W, H)
 }
 
-func drawRect(img *image.NRGBA, x1, y1, x2, y2 int, fill, edge color.NRGBA, W, H int) {
+func drawRect(img *image.RGBA, x1, y1, x2, y2 int, fill, edge color.NRGBA, W, H int) {
 	if x1 >= x2 || y1 >= y2 {
 		return
 	}
@@ -429,7 +446,7 @@ func drawRect(img *image.NRGBA, x1, y1, x2, y2 int, fill, edge color.NRGBA, W, H
 	}
 }
 
-func drawBird(img *image.NRGBA, cx, cy, r int, _ float64, flapTimer int, W, H int) {
+func drawBird(img *image.RGBA, cx, cy, r int, _ float64, flapTimer int, W, H int) {
 	body := color.NRGBA{R: 99, G: 136, B: 168, A: 255}    // classic Go gopher blue-grey
 	snoutC := color.NRGBA{R: 185, G: 210, B: 220, A: 255} // lighter snout
 	pawC := color.NRGBA{R: 72, G: 105, B: 132, A: 255}    // slightly darker for paws
@@ -487,7 +504,7 @@ func drawBird(img *image.NRGBA, cx, cy, r int, _ float64, flapTimer int, W, H in
 }
 
 // drawPaw draws a small paw with three finger-nubs pointing up (flapping) or down (resting).
-func drawPaw(img *image.NRGBA, cx, cy, r int, c color.NRGBA, flapping bool, W, H int) {
+func drawPaw(img *image.RGBA, cx, cy, r int, c color.NRGBA, flapping bool, W, H int) {
 	drawCircle(img, cx, cy, r, c, W, H)
 	fr := max(r/3, 2)
 	dir := 1 // nubs point down when resting
@@ -499,7 +516,7 @@ func drawPaw(img *image.NRGBA, cx, cy, r int, c color.NRGBA, flapping bool, W, H
 	drawCircle(img, cx+r/2, cy+dir*(r-fr/2), fr, c, W, H)
 }
 
-func drawCircle(img *image.NRGBA, cx, cy, r int, c color.NRGBA, W, H int) {
+func drawCircle(img *image.RGBA, cx, cy, r int, c color.NRGBA, W, H int) {
 	r2 := r * r
 	for y := max(cy-r, 0); y <= min(cy+r, H-1); y++ {
 		off := y * img.Stride

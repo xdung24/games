@@ -2,6 +2,8 @@ package flappygophy
 
 import (
 	"encoding/binary"
+	"fmt"
+	"image"
 	"testing"
 	"time"
 
@@ -9,6 +11,95 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 )
+
+func BenchmarkDrawFrame(b *testing.B) {
+	a := test.NewApp()
+	defer a.Quit()
+	for _, size := range [][2]int{{400, 600}, {1200, 1800}, {1920, 1080}} {
+		for _, web := range []bool{false, true} {
+			b.Run(fmt.Sprintf("%dx%d/web=%t", size[0], size[1], web), func(b *testing.B) {
+				g := NewGame(a.Preferences())
+				g.state = StatePlaying
+				g.pipes = []Pipe{{x: 180, gapY: 280}, {x: 350, gapY: 220}}
+				draw := g.drawFrame
+				if web {
+					draw = g.drawWebFrame
+				}
+				draw(size[0], size[1])
+				b.ReportAllocs()
+				b.ResetTimer()
+				for b.Loop() {
+					draw(size[0], size[1])
+				}
+			})
+		}
+	}
+}
+
+func TestWebRasterResolution(t *testing.T) {
+	a := test.NewApp()
+	defer a.Quit()
+	g := NewGame(a.Preferences())
+	for _, size := range []struct {
+		w, h, wantW, wantH int
+	}{
+		{400, 600, 400, 600},
+		{1200, 1800, 400, 600},
+		{1170, 2532, 277, 600},
+		{1920, 1080, 400, 225},
+		{200, 300, 200, 300},
+	} {
+		got := g.drawWebFrame(size.w, size.h).Bounds()
+		if got != image.Rect(0, 0, size.wantW, size.wantH) {
+			t.Errorf("web frame %dx%d: got %v, want %dx%d", size.w, size.h, got, size.wantW, size.wantH)
+		}
+	}
+	if got := g.drawFrame(800, 600).Bounds(); got != image.Rect(0, 0, 800, 600) {
+		t.Fatalf("native rendering must retain full resolution, got %v", got)
+	}
+}
+
+func TestDrawFrameReusesBufferWithoutTrails(t *testing.T) {
+	a := test.NewApp()
+	defer a.Quit()
+	g := NewGame(a.Preferences())
+	g.state = StatePlaying
+	g.pipes = []Pipe{{x: 180, gapY: 280}}
+	first := g.drawFrame(200, 300)
+	frame, ok := first.(*image.RGBA)
+	if !ok {
+		t.Fatal("frames must be RGBA for direct upload without a Fyne image conversion")
+	}
+	for i := 3; i < len(frame.Pix); i += 4 {
+		if frame.Pix[i] != 255 {
+			t.Fatal("directly painted RGBA frames must remain opaque")
+		}
+	}
+	background := g.background
+	for _, point := range []image.Point{{40, 150}, {95, 80}} {
+		if first.At(point.X, point.Y) == background.At(point.X, point.Y) {
+			t.Fatalf("expected a bird or pipe at %v before moving", point)
+		}
+	}
+	g.birdY = 420
+	g.pipes = nil
+	second := g.drawFrame(200, 300)
+	if first != second || g.background != background {
+		t.Fatal("unchanged dimensions must reuse the frame and static background")
+	}
+	for _, point := range []image.Point{{40, 150}, {95, 80}} {
+		if second.At(point.X, point.Y) != background.At(point.X, point.Y) {
+			t.Fatalf("moving objects must not leave a trail at %v", point)
+		}
+	}
+	if second.At(40, 210) == background.At(40, 210) {
+		t.Fatal("the bird must appear at its new position")
+	}
+	g.drawFrame(300, 200)
+	if g.background == background || g.frameImage.Bounds() != image.Rect(0, 0, 300, 200) {
+		t.Fatal("resizing must rebuild the cached images")
+	}
+}
 
 func TestScreenNavigationPreservesRound(t *testing.T) {
 	a := test.NewApp()
