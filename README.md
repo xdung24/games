@@ -13,6 +13,8 @@ The app opens on a game-selection menu with up to 10 games per page. Use
 open it. Brick Breaker and Star Breaker are available. Select the small
 back arrow beside **SCORE** in either game to
 return to the menu; each game is paused and kept for when you return.
+You can also press **Esc** to pause, then press **Esc** again to return Home.
+Other input cancels this two-press sequence.
 This menu is available in both desktop and browser builds.
 The Home menu displays the root `Icon.png` above its subtitle, and each game
 card displays its game's `Icon.png` to the left of the title and description.

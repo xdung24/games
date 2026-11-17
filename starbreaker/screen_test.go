@@ -5,7 +5,50 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/widget"
 )
+
+func TestBoardEscapeReturnsHome(t *testing.T) {
+	a := test.NewApp()
+	defer a.Quit()
+
+	for _, state := range []GameState{StateAttract, StatePlaying, StatePaused, StateGameOver} {
+		game := newPlayingGame()
+		game.state = state
+		game.score = 120
+		board := NewBoard(game)
+		w := test.NewWindow(board)
+		screen := &Screen{window: w, game: game, board: board, content: board}
+		home := widget.NewLabel("Home")
+		backs := 0
+		board.onBack = func() {
+			screen.Hide()
+			backs++
+			w.SetContent(home)
+		}
+		screen.Show()
+		escape := &fyne.KeyEvent{Name: fyne.KeyEscape}
+		board.TypedKey(escape)
+		want := state
+		if state == StatePlaying {
+			want = StatePaused
+		}
+		if game.state != want || backs != 0 || !board.Visible() {
+			t.Fatalf("first Esc must pause without leaving the game in state %v", state)
+		}
+		board.KeyUp(escape)
+		board.TypedKey(escape)
+		if backs != 1 || board.Visible() || w.Content() != home || game.score != 120 {
+			t.Fatalf("second Esc must return Home and preserve progress in state %v", state)
+		}
+		screen.Show()
+		board.TypedKey(escape)
+		if backs != 1 {
+			t.Fatal("returning to a game must start a fresh Esc sequence")
+		}
+		w.Close()
+	}
+}
 
 func TestScreenPreservesGameWhenHidden(t *testing.T) {
 	a := test.NewApp()

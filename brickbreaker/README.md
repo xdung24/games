@@ -16,6 +16,7 @@ The game ends when your lives run out.
 | Mouse move / finger drag / `←` `→` / `A` `D` | Move the paddle |
 | Tap / click / `Space` | Launch the ball · pause / resume · play again |
 | `P` | Pause / resume |
+| `Esc`, then `Esc` again | Pause, then return to the Home menu |
 | `R` | Restart |
 | `M` | Mute / unmute the sound |
 

@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/xdung24/game/internal/navigation"
 )
 
 // Neon palette. Entities are bright, saturated strokes on the dark shader sky;
@@ -51,6 +52,7 @@ type Board struct {
 	toggleMute func() bool
 	muted      func() bool
 	onBack     func()
+	escape     navigation.EscapeHandler
 }
 
 func NewBoard(g *Game) *Board {
@@ -101,21 +103,31 @@ func (b *Board) Refresh() {
 
 // --- input: pointer ---------------------------------------------------------
 
-func (b *Board) Tapped(*fyne.PointEvent) { b.game.Activate() }
+func (b *Board) Tapped(*fyne.PointEvent) {
+	b.escape.Reset()
+	b.game.Activate()
+}
 
 // --- input: keyboard --------------------------------------------------------
 
 func (b *Board) FocusGained() {}
 func (b *Board) FocusLost() {
+	b.escape.Reset()
 	b.game.leftHeld = false
 	b.game.rightHeld = false
 	b.game.thrustHeld = false
 	b.game.fireHeld = false
 	b.game.ship.thrust = false
 }
-func (b *Board) TypedRune(rune) {}
+func (b *Board) TypedRune(rune) { b.escape.Reset() }
 
 func (b *Board) TypedKey(e *fyne.KeyEvent) {
+	if b.escape.TypedKey(e.Name, func() {
+		b.game.Pause()
+		b.Refresh()
+	}, b.onBack) {
+		return
+	}
 	switch e.Name {
 	case fyne.KeyP:
 		b.game.TogglePause()
@@ -152,6 +164,7 @@ func (b *Board) KeyDown(e *fyne.KeyEvent) {
 }
 
 func (b *Board) KeyUp(e *fyne.KeyEvent) {
+	b.escape.KeyUp(e.Name)
 	switch e.Name {
 	case fyne.KeyLeft, fyne.KeyA:
 		b.game.leftHeld = false

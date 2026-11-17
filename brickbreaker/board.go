@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/xdung24/game/internal/navigation"
 )
 
 // Theme colours for the non-brick elements.
@@ -30,6 +31,7 @@ type Board struct {
 
 	onToggleMute func() // toggles sound muting; nil = no-op
 	onBack       func()
+	escape       navigation.EscapeHandler
 }
 
 func NewBoard(g *Game) *Board {
@@ -97,12 +99,14 @@ func (b *Board) MouseMoved(e *desktop.MouseEvent) {
 
 // Tapped runs the same action as the Space key.
 func (b *Board) Tapped(*fyne.PointEvent) {
+	b.escape.Reset()
 	b.activate()
 }
 
 // Dragged steers the paddle to follow a finger (or a dragged mouse) across the
 // board to move paddle.
 func (b *Board) Dragged(e *fyne.DragEvent) {
+	b.escape.Reset()
 	b.game.SetPaddleCenter(e.Position.X)
 }
 
@@ -125,12 +129,19 @@ func (b *Board) activate() {
 
 func (b *Board) FocusGained() {}
 func (b *Board) FocusLost() {
+	b.escape.Reset()
 	b.game.leftHeld = false
 	b.game.rightHeld = false
 }
-func (b *Board) TypedRune(rune) {}
+func (b *Board) TypedRune(rune) { b.escape.Reset() }
 
 func (b *Board) TypedKey(e *fyne.KeyEvent) {
+	if b.escape.TypedKey(e.Name, func() {
+		b.game.Pause()
+		b.Refresh()
+	}, b.onBack) {
+		return
+	}
 	switch e.Name {
 	case fyne.KeySpace:
 		b.activate()
@@ -155,6 +166,7 @@ func (b *Board) KeyDown(e *fyne.KeyEvent) {
 }
 
 func (b *Board) KeyUp(e *fyne.KeyEvent) {
+	b.escape.KeyUp(e.Name)
 	switch e.Name {
 	case fyne.KeyLeft, fyne.KeyA:
 		b.game.leftHeld = false

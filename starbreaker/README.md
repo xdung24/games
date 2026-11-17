@@ -13,6 +13,7 @@ hunting saucer, and clear wave after escalating wave.
 | `Space` | Fire · start · play again |
 | `H` / `↓` | Hyperspace — jump to a random spot (no protection!) |
 | `P` | Pause / resume |
+| `Esc`, then `Esc` again | Pause, then return to the Home menu |
 | `R` | Restart |
 | `M` | Mute / unmute (remembered between runs) |
 
