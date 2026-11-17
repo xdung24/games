@@ -1,5 +1,5 @@
 [build]
-  command = "go run fyne.io/tools/cmd/fyne@latest package -os web"
+  command = "go run fyne.io/tools/cmd/fyne@latest package -os web --release"
   publish = "wasm"
 
 [build.environment]
