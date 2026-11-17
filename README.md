@@ -85,43 +85,16 @@ The generated `wasm` directory is ignored by Git.
 After rebuilding an older debug package, reload the browser with `Ctrl+F5`
 to avoid cached assets. Keep browser hardware acceleration enabled.
 
+## Deploy to web
+
 Upload the generated `wasm` directory contents to your host and serve them over
 HTTP(S); do not open the HTML file directly. Configure the host to serve
 `.wasm` files as `application/wasm`. Both commands may increment the build
 number in `FyneApp.toml`.
 
+Netlify uses `netlify.toml` to package the app and publish `wasm`. Its build
+command runs the Fyne CLI with `go run`, so it does not depend on the Go binary
+installation directory (`GOBIN` or `GOPATH/bin`).
+
 Alternatively, deploy `index.html` alongside the `wasm` directory, keeping that
 directory structure, and include `Icon.png` for the page icon.
-
-Browsers require an interaction before audio starts. The current game may
-remain silent if the audio device is not ready during startup.
-Use the mouse or arrow keys to move and click or press `Space` to launch,
-pause/resume, or play again. The current Fyne web driver does not deliver the
-letter-key shortcuts (`A`/`D`, `P`, `R`, `M`) used by the desktop build.
-
-## Flappy Bird
-
-Tap/click the playfield or press **Space/Up** to start and flap. Pass completely
-through each pipe pair to score one point; hitting a pipe, the ceiling, or the
-ground ends the round. Tap or press **Space/Up** after game over to try again.
-The best score is saved in app preferences.
-
-Use the bottom buttons for Home, pause/resume, restart, and mute. **P**, **R**,
-and **M** also work on desktop. Tap or press **Space/Up** to resume a paused
-round; returning from Home keeps the round paused. The playfield keeps a fixed
-aspect ratio and difficulty at every window size.
-
-The [Felgo reference](https://github.com/FelgoSDK/FlappyBird) was consulted for
-gameplay mechanics. Its license excludes redistribution of the supplied artwork
-and audio, so this implementation uses only original vector artwork and
-synthesized sounds, with no copied reference assets or source code.
-
-## Flappy Gophy
-
-Tap/click or press **Space**, **Enter**, or **Up** to start and flap. Guide the
-Gopher through the pipes and avoid the ceiling and ground. After game over,
-use the same controls to retry. Best scores are saved separately from Flappy Bird.
-
-Use the bottom-right button to pause/resume and the bottom-left arrow to return
-Home. **Esc** pauses; a second separate **Esc** returns Home. Returning to the
-game preserves the paused round. It also pauses when the app leaves the foreground.
