@@ -1,4 +1,4 @@
-package flappybird
+package flappychick
 
 import (
 	"bytes"
@@ -36,7 +36,7 @@ func newSoundPlayer() *soundPlayer {
 	}
 	ctx, err := audio.Context()
 	if err != nil {
-		fyne.LogError("Flappy Bird audio is unavailable", err)
+		fyne.LogError("Flappy Chick audio is unavailable", err)
 		return s
 	}
 	s.ctx = ctx
@@ -52,7 +52,7 @@ func (s *soundPlayer) Play(sound Sound) {
 		if p.IsPlaying() {
 			live = append(live, p)
 		} else if err := p.Close(); err != nil {
-			fyne.LogError("Closing Flappy Bird sound", err)
+			fyne.LogError("Closing Flappy Chick sound", err)
 		}
 	}
 	s.active = live

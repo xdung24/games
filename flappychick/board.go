@@ -1,4 +1,4 @@
-package flappybird
+package flappychick
 
 import (
 	_ "embed"
@@ -17,7 +17,7 @@ import (
 var iconSVG []byte
 
 // Icon is original artwork shared by the launcher and game.
-var Icon = fyne.NewStaticResource("flappy-bird-Icon.svg", iconSVG)
+var Icon = fyne.NewStaticResource("flappy-chick-Icon.svg", iconSVG)
 
 //go:embed bird.svg
 var birdSVG []byte
@@ -125,7 +125,7 @@ func (b *Board) CreateRenderer() fyne.WidgetRenderer {
 	for i := range r.stripes {
 		r.stripes[i] = canvas.NewRectangle(pipeGreen)
 	}
-	r.bird = canvas.NewImageFromResource(fyne.NewStaticResource("flappy-bird.svg", birdSVG))
+	r.bird = canvas.NewImageFromResource(fyne.NewStaticResource("flappy-chick.svg", birdSVG))
 	r.bird.FillMode = canvas.ImageFillStretch
 	r.wing = canvas.NewCircle(color.NRGBA{R: 234, G: 169, B: 91, A: 255})
 	r.wing.StrokeColor, r.wing.StrokeWidth = ink, 1
@@ -257,7 +257,7 @@ func (r *boardRenderer) Refresh() {
 	r.title.TextSize, r.hint.TextSize, r.detail.TextSize = 30*r.scale, 16*r.scale, 13*r.scale
 	switch g.state {
 	case StateReady:
-		r.title.Text = "FLAPPY BIRD"
+		r.title.Text = "Flappy Chick"
 		r.hint.Text = "Tap or press Space to flap"
 		r.detail.Text = "Fly through the gaps. Don't hit a pipe!"
 	case StatePaused:

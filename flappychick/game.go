@@ -1,4 +1,4 @@
-package flappybird
+package flappychick
 
 import "math/rand"
 

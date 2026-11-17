@@ -7,7 +7,7 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	brickbreaker "github.com/xdung24/games/brickbreaker"
-	flappybird "github.com/xdung24/games/flappybird"
+	flappychick "github.com/xdung24/games/flappychick"
 	flappygophy "github.com/xdung24/games/flappygophy"
 	browserinput "github.com/xdung24/games/internal/browserinput"
 	starbreaker "github.com/xdung24/games/starbreaker"
@@ -43,7 +43,7 @@ func main() {
 	var menu *gameMenu
 	var brickScreen *brickbreaker.Screen
 	var starScreen *starbreaker.Screen
-	var flappyScreen *flappybird.Screen
+	var flappyScreen *flappychick.Screen
 	var gophyScreen *flappygophy.Screen
 	showMenu := func() {
 		browserinput.Show("")
@@ -82,15 +82,15 @@ func main() {
 			},
 		},
 		{
-			name:        "Flappy Bird",
+			name:        "Flappy Chick",
 			description: "Tap to flap, slip through the pipes, and beat your best score.",
-			icon:        flappybird.Icon,
+			icon:        flappychick.Icon,
 			play: func() {
 				browserinput.Show("")
 				a.Settings().SetTheme(brickbreaker.NewTheme())
-				w.SetTitle("Flappy Bird")
+				w.SetTitle("Flappy Chick")
 				if flappyScreen == nil {
-					flappyScreen = flappybird.NewScreen(w, a.Preferences(), showMenu)
+					flappyScreen = flappychick.NewScreen(w, a.Preferences(), showMenu)
 				}
 				flappyScreen.Show()
 			},

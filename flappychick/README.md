@@ -1,6 +1,6 @@
-# Flappy Bird
+# Flappy Chick
 
-The [Felgo reference](https://github.com/FelgoSDK/FlappyBird) was consulted for
+The [Felgo reference](https://github.com/FelgoSDK/flappychick) was consulted for
 gameplay mechanics. Its license excludes redistribution of the supplied artwork
 and audio, so this implementation uses only original vector artwork and
 synthesized sounds, with no copied reference assets or source code.

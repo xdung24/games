@@ -1,4 +1,4 @@
-package flappybird
+package flappychick
 
 import (
 	"time"
@@ -6,7 +6,7 @@ import (
 	"fyne.io/fyne/v2"
 )
 
-const bestKey = "flappybird.best"
+const bestKey = "flappychick.best"
 
 type Screen struct {
 	window fyne.Window
