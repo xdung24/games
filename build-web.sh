@@ -8,7 +8,7 @@ if [ -z "$version" ]; then
 	exit 1
 fi
 
-GOOS=js GOARCH=wasm go build -tags 'release no_emoji migrated_fynedo' -ldflags='-s -w' -o web/games.wasm .
+GOOS=js GOARCH=wasm go build -tags 'release migrated_fynedo' -ldflags='-s -w' -o web/games.wasm .
 
 escaped_version=$(printf '%s' "$version" | sed 's/[&#\\]/\\&/g')
 sed -i \

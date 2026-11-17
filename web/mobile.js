@@ -42,6 +42,7 @@
 	gameplay.className = "gameplay-controls";
 	bar.appendChild(gameplay);
 	const left = group(gameplay, "Left-hand gameplay controls", "hand-controls");
+	const center = group(gameplay, "Center gameplay controls", "center-controls");
 	const right = group(gameplay, "Right-hand gameplay controls", "hand-controls");
 
 	function send(type, key) {
@@ -108,8 +109,9 @@
 	}
 
 	for (const [parent, indices] of [
-		[left, [0, 1, 2]],
-		[right, [4, 2, 3]],
+		[left, [0, 1]],
+		[center, [4]],
+		[right, [2, 3]],
 		[system, [5, 6, 7]],
 	]) {
 		for (const index of indices) addButton(parent, index);

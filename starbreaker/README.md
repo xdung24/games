@@ -19,9 +19,8 @@ hunting saucer, and clear wave after escalating wave.
 
 A tap or click also starts the game and fires.
 The custom browser build adds SVG-icon multi-touch controls on touch-capable
-devices. Left, Right, and Thrust sit at the bottom-left; Jump, Thrust, and Fire
-sit at the bottom-right. Either hand can hold Thrust, including both at once;
-releasing one Thrust button does not cancel the other. Hold steering, thrust,
+devices. Left and Right sit at the bottom-left, Jump sits at the bottom-center,
+and Thrust and Fire sit at the bottom-right. Hold steering, thrust,
 and fire simultaneously to steer and shoot. Pause, Restart, and Mute form a
 separate top-right group below the HUD. Icons retain accessible names and tooltips.
 Select the small back arrow beside **SCORE** to return to the launcher.
