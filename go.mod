@@ -4,7 +4,9 @@ go 1.26.0
 
 require (
 	fyne.io/fyne/v2 v2.8.0
+	github.com/HugoSmits86/nativewebp v1.3.0
 	github.com/ebitengine/oto/v3 v3.3.3
+	golang.org/x/image v0.45.0
 )
 
 require (
@@ -39,7 +41,6 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
-	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
