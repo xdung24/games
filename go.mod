@@ -1,4 +1,4 @@
-module github.com/xdung24/game
+module github.com/xdung24/games
 
 go 1.26.0
 
