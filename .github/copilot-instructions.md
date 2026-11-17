@@ -22,9 +22,17 @@ dependency versions declared in [go.mod](../go.mod).
   - `sound.go`: synthesized effects and per-game mute handling.
   - `theme.go`: game-specific theme.
   - Star Breaker's `shaders.go`: desktop and OpenGL ES background shaders.
+- [flappychick/](../flappychick): reference for lightweight retained rendering,
+  elapsed-time simulation, and skipping redraws outside active play.
+- [flappygophy/](../flappygophy): simulation/input in `main.go`, reusable visual
+  objects in `scene.go`, and session/HUD management in `screen.go`.
 - [internal/audio/](../internal/audio): the shared Oto audio context.
 - [internal/navigation/](../internal/navigation): shared double-Esc handling.
-- [index.html](../index.html): full-window iframe loading `wasm/index.html`.
+- [internal/browserinput/](../internal/browserinput): browser touch-control
+  integration, with no-op implementations for native builds.
+- [index.html](../index.html): full-window iframe loading `web/index.html`.
+- [web/](../web): checked-in browser shell, zoom/keyboard restrictions, and
+  multi-touch controls in `mobile.js`/`mobile.css`; only the WASM binary is generated.
 - [Games.toml](../Games.toml): application metadata; the launcher currently
   registers games explicitly in `main.go`, not by reading this file.
 
@@ -41,7 +49,8 @@ dependency versions declared in [go.mod](../go.mod).
   a game package. Restore the Home title, theme, and menu through the launcher.
 - Pause initialized games when the application leaves the foreground. Release
   held controls and reset pending navigation when a board loses focus.
-- Simulation loops target 60 FPS and clamp elapsed time to 0.05 seconds.
+- Simulation loops target 60 FPS. For elapsed-time models, clamp elapsed time
+  to 0.05 seconds; preserve existing fixed-step timing where used.
   Schedule model updates and canvas changes from background tickers with
   `fyne.Do`; do not mutate game or widget state directly from ticker goroutines.
 - Skip simulation work while a board is hidden. Preserve Brick Breaker's
@@ -59,10 +68,12 @@ dependency versions declared in [go.mod](../go.mod).
 - Keep keyboard selection visible by scrolling it into view, and restore the
   selection when returning Home. Restore prior canvas key handlers when leaving
   the menu so menu navigation cannot intercept gameplay input.
-- Display the root `Icon.png` above the Home subtitle and each game's `Icon.png`
+- Display the root `Icon.png` above the Home subtitle and each game's icon
   to the left of its card's title and description. Embed launcher icons with
   `go:embed` and preserve their aspect ratios.
-- Use the small, low-importance back-arrow button beside SCORE in each game.
+- Preserve existing back-arrow placement: beside SCORE in the breaker games
+  and bottom-left in the flappy games. For the breaker games, use the small,
+  low-importance back-arrow button beside SCORE.
   Keep it clickable above pause/game-over overlays and clear of other HUD text.
   Create it with `widget.NewButtonWithIcon("", theme.NavigateBackIcon(), ...)`
   and `widget.LowImportance`; do not add a separate Home toolbar or text label.
@@ -79,6 +90,60 @@ dependency versions declared in [go.mod](../go.mod).
 - Use theme colors for launcher highlights, preserve smooth fade reversal,
   and honor `Settings().ShowAnimations()`.
 
+## Rendering and performance requirements
+
+- Treat visual quality and responsiveness as joint requirements. Do not solve
+  slowness by lowering the full-scene resolution, blurring/pixelating artwork,
+  removing detail, or dropping the frame rate without explicit user approval.
+- Prefer retained scene objects, following
+  [Flappy Chick's renderer](../flappychick/board.go) and
+  [Flappy Gophy's scene](../flappygophy/scene.go). Create objects once, then
+  move them and toggle visibility. Do not rebuild the scene on every tick.
+- Do not paint or allocate full-screen CPU images every frame. Avoid per-frame
+  pixel loops, image-format conversions, and full-screen texture uploads.
+  Use GPU-drawn primitives/gradients and cached artwork instead.
+- Keep static layers static. Generate detailed textures only when their size
+  or content changes; do not call `Refresh()` on an unchanged raster or image.
+  Moving a sprite should not invalidate its texture.
+- Render SVG artwork at native display density and cache animation poses.
+  Validate centering, transparent margins, and clipping in Fyne itself, not
+  just an SVG preview. Never trade away high-DPI sharpness as a shortcut.
+- Clip sprites at the playfield boundary, for example with `container.NewClip`,
+  rather than changing their dimensions every frame as they enter or leave
+  the screen. Resizing SVG images can trigger expensive rasterization.
+- Avoid unnecessary allocations in update/render loops. Reuse bounded object
+  pools, buffers, and model slices where safe. Do not synthesize or decode
+  reusable assets repeatedly in the hot path.
+- Redraw only when something changes. Skip hidden games, and stop continuous
+  rendering in ready/title, paused, and game-over states unless an intentional
+  visible animation requires it. Always draw the final collision/state-change
+  frame. Idle games should not consume an active game's CPU/GPU budget.
+- Keep physics independent of painting and device pixel ratio. Do not change
+  speed, collision geometry, scoring, or input timing to hide rendering stalls.
+  Avoid unbounded update backlogs or catch-up work after backgrounding.
+
+## Mobile experience requirements
+
+- Keep all games playable without a physical keyboard. Use tap/drag when that
+  already provides complete control; add virtual buttons only for otherwise
+  inaccessible actions, as in Star Breaker.
+- Support simultaneous held actions such as steering, thrust, and firing.
+  Use pointer capture and track individual touches; releasing one finger must
+  not release an action still held by another.
+- Release held controls on pointer-up, cancellation, lost capture, blur,
+  visibility loss, and navigation. Pause through the existing lifecycle.
+  Prevent touch controls from also activating the game underneath them.
+- Keep touch targets at least 44 CSS pixels where practical. Respect safe
+  areas, reserve playfield space for control bars, and avoid obscuring the
+  player, HUD, pause, or Home controls in portrait and landscape.
+- Preserve the viewport/gesture restrictions in both HTML entry pages.
+  Keep the Fyne dummy input read-only with `inputmode="none"` so focusing
+  game controls does not open the on-screen keyboard or resize the viewport.
+  Do not disable physical keyboard input.
+- Test narrow phone layouts, landscape, touch dragging, rapid taps, multi-touch,
+  pause/resume, and returning Home. Avoid accidental zoom, page scrolling,
+  context menus, duplicate actions, and stuck controls.
+
 ## Audio and browser compatibility
 
 - Obtain the audio device through `audio.Context()`; Oto does not support a
@@ -90,8 +155,10 @@ dependency versions declared in [go.mod](../go.mod).
 - Preserve desktop and browser support for input and rendering. Test browser
   controls rather than assuming letter-key shortcuts are delivered by the
   Fyne web driver. Retain both desktop and OpenGL ES shader variants.
-- Edit the root web entry page, not generated files in `wasm`. Preserve the
-  iframe's relative URL and autoplay permission.
+- Edit the checked-in root/browser entry pages and assets in `web`, not the
+  generated WASM binary. Preserve the iframe's relative URL, autoplay
+  permission, and mobile input protections. Do not replace the custom web
+  shell with Fyne-generated HTML without retaining these integrations.
 
 ## Adding a game
 
@@ -101,7 +168,7 @@ dependency versions declared in [go.mod](../go.mod).
 3. Lazily create and retain its screen, select its theme on launch, and pass the
    shared Home callback to `NewScreen`.
 4. Include it in foreground-pause handling and reuse shared audio/navigation.
-5. Add the same in-board back-arrow button beside SCORE and wire its `onBack`
+5. Reuse the appropriate in-game back-arrow pattern and wire its `onBack`
    callback to hide the session before returning Home.
 6. Update the root README and verify desktop and WebAssembly builds.
 
@@ -116,17 +183,48 @@ Windows PowerShell examples:
 
 ```powershell
 go run .
-go test -ldflags="-linkmode=internal" .\...
-go build -ldflags="-linkmode=internal -H=windowsgui -s -w" -o bin\game.exe .
+go test -tags "ci migrated_fynedo" .\flappygophy
+go build -tags "release no_emoji migrated_fynedo" -ldflags="-linkmode=internal -H=windowsgui -s -w" -o bin\games.exe .
 ```
 
-For browser packaging, use the installed Fyne CLI from the repository root:
+Select the changed packages for tests; use `.\...` when cross-package behavior
+requires the full suite. The `ci` tag enables headless Fyne validation.
+For a release browser build matching [Netlify](../netlify.toml):
 
 ```powershell
-& "$env:USERPROFILE\go\bin\fyne.exe" package -os web --release
+$env:GOOS = "js"
+$env:GOARCH = "wasm"
+go build -tags "release no_emoji migrated_fynedo" -ldflags="-s -w" -o web\games.wasm .
+Remove-Item Env:GOOS, Env:GOARCH
 ```
 
-Use release-mode browser builds for performance checks. `bin` and `wasm` are
-generated, ignored output directories; do not hand-edit or commit their contents.
+Use release-mode browser builds for performance checks; debug WebGL checks
+can distort results. Preserve `migrated_fynedo`, which matches the app's Fyne
+threading migration. Do not hand-edit or commit generated `bin` outputs or
+`web/games.wasm`.
 Update the root and affected game README when controls, lifecycle, build steps,
 or supported games change.
+
+## Performance verification before declaring a fix
+
+1. Reproduce and measure the actual slow path before changing it. Compare with
+   Flappy Chick using the same build, viewport, device pixel ratio, focus,
+   visibility, and CPU-throttling settings. Verify gameplay is active rather
+   than paused; background tabs throttle timers and animation frames.
+2. Aim for 60 FPS (about 16.7 ms per frame) on representative mobile hardware.
+   Record frame-time distribution, long stalls, main-thread work, allocations,
+   and texture uploads as relevant. Report browser/tool limitations instead
+   of claiming an unverified frame rate.
+3. Measure both warmed-up gameplay and cold paths: opening a game, first flap,
+   new pipes/assets, resize/orientation changes, and background/resume. Do not
+   hide startup or spawn stalls inside a favorable average.
+4. Verify idle screens stop rendering and steady movement does not repaint or
+   upload a full-screen bitmap. Microbenchmarks alone do not prove smooth
+   gameplay; run the rebuilt WASM in a browser and confirm the asset is fresh,
+   using a hard reload when needed.
+5. Inspect before/after screenshots at normal and high density, including a
+   3x-DPI phone and landscape. Check crisp artwork, correct proportions,
+   unclipped sprites, readable HUD text, and reachable controls. A smaller
+   raster or a passing benchmark is not an acceptable proxy for visual quality.
+6. Add focused regressions for the fixed behavior, run affected tests and the
+   release WASM build, and report measured results and remaining limitations.
