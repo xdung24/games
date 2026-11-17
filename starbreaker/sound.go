@@ -9,7 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"github.com/ebitengine/oto/v3"
-	"github.com/xdung24/game/internal/audio"
+	"github.com/xdung24/games/internal/audio"
 )
 
 // Audio format for the synthesized blips: CD-quality mono, 16-bit signed.

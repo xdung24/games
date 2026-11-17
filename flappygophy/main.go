@@ -1,0 +1,603 @@
+package flappygophy
+
+import (
+	"image"
+	"image/color"
+	"math"
+	"math/rand"
+	"sync"
+	"time"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/driver/mobile"
+	"fyne.io/fyne/v2/widget"
+	"github.com/xdung24/games/internal/navigation"
+)
+
+// ── Game constants (logical pixel space 400×600) ─────────────────────────────
+
+const (
+	gameW = 400.0
+	gameH = 600.0
+
+	birdX      = 80.0
+	birdRadius = 20.0
+
+	gravity   = 0.28
+	flapForce = -6.5
+
+	pipeW      = 65.0
+	pipeGap    = 160.0
+	pipeSpeed  = 2.8
+	pipePeriod = 90 // frames between new pipe pairs
+
+	groundH = 70.0
+)
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+type State int
+
+const (
+	StateStart State = iota
+	StatePlaying
+	StateOver
+	StatePaused
+)
+
+// ── Pipe ──────────────────────────────────────────────────────────────────────
+
+type Pipe struct {
+	x, gapY float64
+}
+
+// ── Game ──────────────────────────────────────────────────────────────────────
+
+type Game struct {
+	mu        sync.Mutex
+	state     State
+	birdY     float64
+	birdVY    float64
+	pipes     []Pipe
+	score     int
+	hiScore   int
+	frame     int
+	flapTimer int
+	deathTime time.Time
+	prefs     fyne.Preferences
+
+	raster    *canvas.Raster
+	scoreText *canvas.Text
+	msgText   *canvas.Text
+	subText   *canvas.Text
+}
+
+func NewGame(prefs fyne.Preferences) *Game {
+	g := &Game{
+		birdY:   gameH / 2,
+		prefs:   prefs,
+		hiScore: prefs.IntWithFallback("flappygophy.hiScore", 0),
+	}
+
+	g.raster = canvas.NewRaster(g.drawFrame)
+	g.raster.SetMinSize(fyne.NewSize(gameW, gameH))
+
+	g.scoreText = canvas.NewText("0", color.White)
+	g.scoreText.TextSize = 44
+	g.scoreText.TextStyle = fyne.TextStyle{Bold: true}
+	g.scoreText.Alignment = fyne.TextAlignCenter
+
+	g.msgText = canvas.NewText("FLAPPY GOPHY", color.White)
+	g.msgText.TextSize = 34
+	g.msgText.TextStyle = fyne.TextStyle{Bold: true}
+	g.msgText.Alignment = fyne.TextAlignCenter
+
+	txt := "hit space/enter to play"
+	if fyne.CurrentDevice().IsMobile() {
+		txt = "tap to play"
+	}
+	g.subText = canvas.NewText(txt, color.RGBA{R: 255, G: 240, B: 80, A: 255})
+	g.subText.TextSize = 18
+	g.subText.Alignment = fyne.TextAlignCenter
+	return g
+}
+
+// flap is called on Space key or tap – transitions game state and applies upward impulse.
+func (g *Game) flap() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	switch g.state {
+	case StatePaused:
+		g.state = StatePlaying
+	case StateStart:
+		g.state = StatePlaying
+		g.birdVY = flapForce
+		g.flapTimer = 20
+		go playJingle()
+	case StatePlaying:
+		g.birdVY = flapForce
+		g.flapTimer = 20
+		go playFlap()
+	case StateOver:
+		if time.Since(g.deathTime) < 100*time.Millisecond {
+			return
+		}
+		g.birdY = gameH / 2
+		g.birdVY = flapForce
+		g.pipes = nil
+		g.score = 0
+		g.frame = 0
+		g.flapTimer = 20
+		g.state = StatePlaying
+		go playJingle()
+	}
+}
+
+func (g *Game) Pause() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.state == StatePlaying {
+		g.state = StatePaused
+	}
+}
+
+func (g *Game) TogglePause() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	switch g.state {
+	case StatePlaying:
+		g.state = StatePaused
+	case StatePaused:
+		g.state = StatePlaying
+	}
+}
+
+// endRound is called with mu held.
+func (g *Game) endRound() {
+	g.state = StateOver
+	g.deathTime = time.Now()
+	if g.score > g.hiScore {
+		g.hiScore = g.score
+		g.prefs.SetInt("flappygophy.hiScore", g.hiScore)
+	}
+	go playSplat()
+}
+
+// update advances physics and checks collisions; called every tick.
+func (g *Game) update() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.state != StatePlaying {
+		return
+	}
+
+	g.frame++
+	if g.flapTimer > 0 {
+		g.flapTimer--
+	}
+	g.birdVY += gravity
+	g.birdY += g.birdVY
+
+	// Spawn a new pipe pair.
+	if g.frame%pipePeriod == 1 {
+		lo := pipeGap/2 + 50
+		hi := gameH - groundH - pipeGap/2 - 50
+		gapY := lo + rand.Float64()*(hi-lo)
+		g.pipes = append(g.pipes, Pipe{x: gameW + 10, gapY: gapY})
+	}
+
+	// Move pipes left; score when bird clears the right edge.
+	var keep []Pipe
+	for _, p := range g.pipes {
+		p.x -= pipeSpeed
+		oldRight := p.x + pipeW + pipeSpeed
+		if oldRight >= birdX && p.x+pipeW < birdX {
+			g.score++
+		}
+		if p.x+pipeW > 0 {
+			keep = append(keep, p)
+		}
+	}
+	g.pipes = keep
+
+	// Ground / ceiling collision.
+	if g.birdY-birdRadius <= 0 || g.birdY+birdRadius >= gameH-groundH {
+		g.endRound()
+		return
+	}
+	// Pipe collision.
+	for _, p := range g.pipes {
+		if pipeCollides(g.birdY, p) {
+			g.endRound()
+			return
+		}
+	}
+}
+
+func pipeCollides(birdY float64, p Pipe) bool {
+	if birdX+birdRadius < p.x || birdX-birdRadius > p.x+pipeW {
+		return false
+	}
+	topEdge := p.gapY - pipeGap/2
+	botEdge := p.gapY + pipeGap/2
+	return birdY-birdRadius < topEdge || birdY+birdRadius > botEdge
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+
+func (g *Game) drawFrame(w, h int) image.Image {
+	g.mu.Lock()
+	state := g.state
+	by := g.birdY
+	bvy := g.birdVY
+	ft := g.flapTimer
+	pipes := make([]Pipe, len(g.pipes))
+	copy(pipes, g.pipes)
+	g.mu.Unlock()
+
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	sx, sy := float64(w)/gameW, float64(h)/gameH
+	gndY := int((gameH - groundH) * sy)
+
+	// Sky gradient: light-blue top → clear blue → deeper horizon blue.
+	for y := 0; y < gndY; y++ {
+		t := float64(y) / float64(gndY)
+		var r, gg, b uint8
+		if t < 0.15 {
+			u := t / 0.15 // 0→1 over the top 15%
+			r, gg, b = clamp8(lerp(185, 135, u)), clamp8(lerp(225, 206, u)), clamp8(lerp(250, 235, u))
+		} else {
+			u := (t - 0.15) / 0.85 // 0→1 over the lower 85%
+			r, gg, b = clamp8(lerp(135, 80, u)), clamp8(lerp(206, 160, u)), clamp8(lerp(235, 210, u))
+		}
+		off := y * img.Stride
+		for x := 0; x < w; x++ {
+			img.Pix[off+x*4], img.Pix[off+x*4+1], img.Pix[off+x*4+2], img.Pix[off+x*4+3] = r, gg, b, 255
+		}
+	}
+
+	// Clouds (drawn into the sky before ground/pipes).
+	drawClouds(img, w, h, sx, sy)
+
+	// Ground (rocky texture).
+	drawGround(img, gndY, w, h)
+
+	// Pipes.
+	for _, p := range pipes {
+		drawPipe(img, p, sx, sy, gndY, w, h)
+	}
+
+	// Bird / logo.
+	if state == StateStart {
+		// Draw a larger, centred gopher as the title screen logo.
+		lx := w / 2
+		ly := int(float64(h) * 0.30)
+		lr := max(int(38*math.Min(sx, sy)), 12)
+		drawBird(img, lx, ly, lr, 0, 0, w, h)
+	} else {
+		bx := int(birdX * sx)
+		byPx := int(by * sy)
+		br := max(int(birdRadius*math.Min(sx, sy)), 8)
+		drawBird(img, bx, byPx, br, bvy, ft, w, h)
+	}
+
+	return img
+}
+
+func lerp(a, b uint8, t float64) float64 { return float64(a)*(1-t) + float64(b)*t }
+func clamp8(v float64) uint8             { return uint8(v) }
+
+// groundHash returns a deterministic value in [-32, 31] for a given (x, y).
+func groundHash(x, y int) int {
+	h := uint32(x)*2654435761 ^ uint32(y)*2246822519
+	h ^= h >> 15
+	h *= 2246822519
+	h ^= h >> 13
+	return int(h&0x3F) - 32
+}
+
+// drawGround renders a rocky ledge with horizontal strata, per-pixel grain,
+// a dark shadow lip at the top, and sparse crack pixels.
+func drawGround(img *image.NRGBA, gndY, w, h int) {
+	for y := gndY; y < h; y++ {
+		off := y * img.Stride
+		dy := y - gndY
+		// Strata: a single band offset shared across all x in a 10-px-tall row.
+		band := groundHash(0, (y/10)*10) / 2 // [-16, 15]
+		for x := 0; x < w; x++ {
+			var rv, gv, bv uint8
+			if dy < 4 {
+				// Dark overhang shadow.
+				shade := uint8(50 + dy*8)
+				rv, gv, bv = shade, shade-5, shade-10
+			} else {
+				grain := groundHash(x, y) >> 2 // [-8, 7] per-pixel noise
+				v := band + grain              // [-24, 22]
+				rv = uint8(145 + v)
+				gv = uint8(133 + v)
+				bv = uint8(118 + v)
+				// Sparse dark crack pixels (~1 in 128).
+				if groundHash(x+37, y+13)&0x7F == 0 {
+					rv, gv, bv = 72, 64, 56
+				}
+			}
+			img.Pix[off+x*4] = rv
+			img.Pix[off+x*4+1] = gv
+			img.Pix[off+x*4+2] = bv
+			img.Pix[off+x*4+3] = 255
+		}
+	}
+}
+
+func drawClouds(img *image.NRGBA, w, h int, sx, sy float64) {
+	tSec := float64(time.Now().UnixMilli()) * 0.001
+	const cloudMargin = 150
+	const span = float64(gameW + 2*cloudMargin)
+	cloudYOffset := gameH * 0.08
+
+	for _, spec := range cloudDefs {
+		elapsed := float64(math.Mod(tSec*float64(spec.speed), span))
+		cx := float64(spec.baseX) - elapsed
+		if cx < -cloudMargin {
+			cx += span
+		}
+		for _, puff := range cloudPuffs {
+			pr := int(float64(spec.radius) * float64(puff[2]) * math.Min(sx, sy))
+			px := int((cx + float64(spec.radius)*float64(puff[0])) * sx)
+			py := int((float64(spec.baseY) + float64(spec.radius)*float64(puff[1]) + cloudYOffset) * sy)
+			drawCircleAlpha(img, px, py, pr, 245, 250, 255, 220, w, h)
+		}
+	}
+}
+
+// drawCircleAlpha draws a filled circle with alpha blending onto the image.
+func drawCircleAlpha(img *image.NRGBA, cx, cy, r int, cr, cg, cb, ca uint8, W, H int) {
+	r2 := r * r
+	a := int(ca)
+	inv := 255 - a
+	for y := max(cy-r, 0); y <= min(cy+r, H-1); y++ {
+		off := y * img.Stride
+		for x := max(cx-r, 0); x <= min(cx+r, W-1); x++ {
+			dx, dy := x-cx, y-cy
+			if dx*dx+dy*dy <= r2 {
+				i := off + x*4
+				img.Pix[i] = uint8((a*int(cr) + inv*int(img.Pix[i])) / 255)
+				img.Pix[i+1] = uint8((a*int(cg) + inv*int(img.Pix[i+1])) / 255)
+				img.Pix[i+2] = uint8((a*int(cb) + inv*int(img.Pix[i+2])) / 255)
+				img.Pix[i+3] = 255
+			}
+		}
+	}
+}
+
+func drawPipe(img *image.NRGBA, p Pipe, sx, sy float64, gndY, W, H int) {
+	x1 := int(p.x * sx)
+	x2 := int((p.x + pipeW) * sx)
+	topB := int((p.gapY - pipeGap/2) * sy)
+	botT := int((p.gapY + pipeGap/2) * sy)
+	capH := max(int(14*sy), 7)
+	cx1 := x1 - max(int(5*sx), 3)
+	cx2 := x2 + max(int(5*sx), 3)
+
+	fill := color.NRGBA{R: 80, G: 195, B: 78, A: 255}
+	edge := color.NRGBA{R: 50, G: 140, B: 45, A: 255}
+	cap1 := color.NRGBA{R: 65, G: 178, B: 63, A: 255}
+	cape := color.NRGBA{R: 40, G: 125, B: 38, A: 255}
+
+	drawRect(img, x1, 0, x2, topB-capH, fill, edge, W, H)
+	drawRect(img, cx1, topB-capH, cx2, topB, cap1, cape, W, H)
+	drawRect(img, x1, botT+capH, x2, gndY, fill, edge, W, H)
+	drawRect(img, cx1, botT, cx2, botT+capH, cap1, cape, W, H)
+
+	// Shine – a narrow bright strip near the left of each section to fake a
+	// cylindrical highlight. Two strips: a bright leading edge then a softer mid.
+	sw := max(int(3*sx), 2)
+	shx := x1 + max(int(3*sx), 2) // just inside the left dark edge
+	shcx := cx1 + max(int(3*sx), 2)
+	hi1 := color.NRGBA{R: 165, G: 235, B: 135, A: 255}
+	hi2 := color.NRGBA{R: 120, G: 215, B: 100, A: 255}
+
+	// Shaft shine
+	drawRect(img, shx, 0, shx+sw, topB-capH, hi1, hi1, W, H)
+	drawRect(img, shx+sw, 0, shx+sw*3, topB-capH, hi2, hi2, W, H)
+	drawRect(img, shx, botT+capH, shx+sw, gndY, hi1, hi1, W, H)
+	drawRect(img, shx+sw, botT+capH, shx+sw*3, gndY, hi2, hi2, W, H)
+	// Cap shine
+	drawRect(img, shcx, topB-capH, shcx+sw, topB, hi1, hi1, W, H)
+	drawRect(img, shcx+sw, topB-capH, shcx+sw*3, topB, hi2, hi2, W, H)
+	drawRect(img, shcx, botT, shcx+sw, botT+capH, hi1, hi1, W, H)
+	drawRect(img, shcx+sw, botT, shcx+sw*3, botT+capH, hi2, hi2, W, H)
+}
+
+func drawRect(img *image.NRGBA, x1, y1, x2, y2 int, fill, edge color.NRGBA, W, H int) {
+	if x1 >= x2 || y1 >= y2 {
+		return
+	}
+	x1, y1 = max(x1, 0), max(y1, 0)
+	x2, y2 = min(x2, W), min(y2, H)
+	for y := y1; y < y2; y++ {
+		off := y * img.Stride
+		for x := x1; x < x2; x++ {
+			c := fill
+			if x == x1 || x == x2-1 {
+				c = edge
+			}
+			img.Pix[off+x*4], img.Pix[off+x*4+1], img.Pix[off+x*4+2], img.Pix[off+x*4+3] = c.R, c.G, c.B, c.A
+		}
+	}
+}
+
+func drawBird(img *image.NRGBA, cx, cy, r int, _ float64, flapTimer int, W, H int) {
+	body := color.NRGBA{R: 99, G: 136, B: 168, A: 255}    // classic Go gopher blue-grey
+	snoutC := color.NRGBA{R: 185, G: 210, B: 220, A: 255} // lighter snout
+	pawC := color.NRGBA{R: 72, G: 105, B: 132, A: 255}    // slightly darker for paws
+	white := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
+	dark := color.NRGBA{R: 15, G: 15, B: 15, A: 255}
+
+	flapping := flapTimer > 0
+
+	// Front paw – rises when flapping.
+	fpx := cx + r/3
+	fpy := cy + r*3/4
+	if flapping {
+		fpy = cy - r*3/4
+	}
+	drawPaw(img, fpx, fpy, r/3, pawC, flapping, W, H)
+
+	// Body.
+	drawCircle(img, cx, cy, r, body, W, H)
+
+	// Back paw – rises when flapping.
+	bpx := cx - r*2/3
+	bpy := cy + r*3/5
+	if flapping {
+		bpy = cy - r*3/5
+	}
+	drawPaw(img, bpx, bpy, r/3, pawC, flapping, W, H)
+
+	// Snout (right-forward).
+	snoutX := cx + r*3/5
+	snoutY := cy + r/6
+	snoutR := r * 2 / 5
+	drawCircle(img, snoutX, snoutY, snoutR, snoutC, W, H)
+
+	// Nose.
+	drawCircle(img, snoutX+snoutR/3, snoutY-snoutR/3, max(r/7, 2), dark, W, H)
+
+	// Teeth – two white rectangles below snout.
+	tw := r / 5
+	toothTop := snoutY + snoutR/2
+	toothBot := toothTop + r*2/5
+	drawRect(img, snoutX-tw-1, toothTop, snoutX-1, toothBot, white, white, W, H)
+	drawRect(img, snoutX+1, toothTop, snoutX+tw+1, toothBot, white, white, W, H)
+
+	// Eye (large white circle with pupil and shine).
+	// Pupil shifts upward when flapping.
+	eyeX := cx + r/4
+	eyeY := cy - r/4
+	pupilDY := 0
+	if flapping {
+		pupilDY = -3
+	}
+	drawCircle(img, eyeX, eyeY, r/3, white, W, H)
+	drawCircle(img, eyeX+r/8, eyeY+pupilDY/2, r/5, dark, W, H)
+	drawCircle(img, eyeX+r/8+3+pupilDY, eyeY+pupilDY, max(r/8, 1), white, W, H)
+}
+
+// drawPaw draws a small paw with three finger-nubs pointing up (flapping) or down (resting).
+func drawPaw(img *image.NRGBA, cx, cy, r int, c color.NRGBA, flapping bool, W, H int) {
+	drawCircle(img, cx, cy, r, c, W, H)
+	fr := max(r/3, 2)
+	dir := 1 // nubs point down when resting
+	if flapping {
+		dir = -1 // nubs point up when flapping
+	}
+	drawCircle(img, cx-r/2, cy+dir*(r-fr/2), fr, c, W, H)
+	drawCircle(img, cx, cy+dir*r, fr, c, W, H)
+	drawCircle(img, cx+r/2, cy+dir*(r-fr/2), fr, c, W, H)
+}
+
+func drawCircle(img *image.NRGBA, cx, cy, r int, c color.NRGBA, W, H int) {
+	r2 := r * r
+	for y := max(cy-r, 0); y <= min(cy+r, H-1); y++ {
+		off := y * img.Stride
+		for x := max(cx-r, 0); x <= min(cx+r, W-1); x++ {
+			dx, dy := x-cx, y-cy
+			if dx*dx+dy*dy <= r2 {
+				img.Pix[off+x*4], img.Pix[off+x*4+1], img.Pix[off+x*4+2], img.Pix[off+x*4+3] = c.R, c.G, c.B, c.A
+			}
+		}
+	}
+}
+
+// ── Tap widget ────────────────────────────────────────────────────────────────
+
+// tapWidget is an invisible widget that fills its container and captures taps.
+type tapWidget struct {
+	widget.BaseWidget
+	onTap   func()
+	onPause func()
+	onBack  func()
+	escape  navigation.EscapeHandler
+}
+
+func newTapWidget(fn func()) *tapWidget {
+	t := &tapWidget{onTap: fn}
+	t.ExtendBaseWidget(t)
+	return t
+}
+
+func (t *tapWidget) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(canvas.NewRectangle(color.Transparent))
+}
+
+func (t *tapWidget) MouseDown(*desktop.MouseEvent) {
+	t.activate()
+}
+
+func (t *tapWidget) activate() {
+	t.escape.Reset()
+	if c := fyne.CurrentApp().Driver().CanvasForObject(t); c != nil {
+		c.Focus(t)
+	}
+	if t.onTap != nil {
+		t.onTap()
+	}
+}
+
+func (t *tapWidget) MouseUp(*desktop.MouseEvent) {}
+
+func (t *tapWidget) TouchDown(*mobile.TouchEvent) {
+	t.activate()
+}
+
+func (t *tapWidget) TouchUp(*mobile.TouchEvent)     {}
+func (t *tapWidget) TouchCancel(*mobile.TouchEvent) {}
+
+func (t *tapWidget) FocusGained()           {}
+func (t *tapWidget) FocusLost()             { t.escape.Reset() }
+func (t *tapWidget) TypedRune(rune)         { t.escape.Reset() }
+func (t *tapWidget) KeyDown(*fyne.KeyEvent) {}
+func (t *tapWidget) KeyUp(e *fyne.KeyEvent) { t.escape.KeyUp(e.Name) }
+
+func (t *tapWidget) TypedKey(e *fyne.KeyEvent) {
+	if t.escape.TypedKey(e.Name, t.onPause, t.onBack) {
+		return
+	}
+	switch e.Name {
+	case fyne.KeySpace, fyne.KeyReturn, fyne.KeyEnter, fyne.KeyUp:
+		t.activate()
+	}
+}
+
+// ── Overlay (clouds + ground bar) ─────────────────────────────────────────────
+
+const (
+	numClouds     = 5
+	puffsPerCloud = 5
+)
+
+// cloudPuffs gives (dxFrac, dyFrac, rFrac) relative to the cloud centre.
+// Each puff circle's position = centre + offset*mainRadius.
+var cloudPuffs = [puffsPerCloud][3]float32{
+	{0, 0, 1},
+	{-2.0 / 3, 1.0 / 3, 2.0 / 3},
+	{2.0 / 3, 1.0 / 3, 2.0 / 3},
+	{-1.0 / 3, -1.0 / 5, 4.0 / 5},
+	{1.0 / 3, -1.0 / 5, 4.0 / 5},
+}
+
+type cloudSpec struct{ baseX, baseY, radius, speed float32 }
+
+// cloudDefs lists each cloud.  All clouds are positioned near the top of the
+// screen; negative baseY centres them above the safe-area edge so their lower
+// puffs emerge into the status-bar inset area.
+var cloudDefs = [numClouds]cloudSpec{
+	{60, -22, 32, 10},
+	{230, -10, 28, 8},
+	{355, -5, 20, 13},
+	{130, 18, 24, 7},
+	{375, -15, 23, 12},
+}

@@ -6,9 +6,10 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
-	brickbreaker "github.com/xdung24/game/brickbreaker"
-	"github.com/xdung24/game/flappybird"
-	starbreaker "github.com/xdung24/game/starbreaker"
+	brickbreaker "github.com/xdung24/games/brickbreaker"
+	flappybird "github.com/xdung24/games/flappybird"
+	flappygophy "github.com/xdung24/games/flappygophy"
+	starbreaker "github.com/xdung24/games/starbreaker"
 )
 
 //go:embed Icon.png
@@ -19,6 +20,9 @@ var brickBreakerIconPNG []byte
 
 //go:embed starbreaker/Icon.png
 var starBreakerIconPNG []byte
+
+//go:embed flappygophy/Icon.png
+var flappyGophyIconPNG []byte
 
 var homeIcon = fyne.NewStaticResource("Icon.png", homeIconPNG)
 
@@ -39,6 +43,7 @@ func main() {
 	var brickScreen *brickbreaker.Screen
 	var starScreen *starbreaker.Screen
 	var flappyScreen *flappybird.Screen
+	var gophyScreen *flappygophy.Screen
 	showMenu := func() {
 		a.Settings().SetTheme(brickbreaker.NewTheme())
 		w.SetTitle("Play game")
@@ -84,6 +89,19 @@ func main() {
 				}
 				flappyScreen.Show()
 			},
+		},
+		{
+			name:        "Flappy Gophy",
+			description: "Guide a hyperactive Gopher through the pipes.",
+			icon:        fyne.NewStaticResource("flappy-gophy-Icon.png", flappyGophyIconPNG),
+			play: func() {
+				a.Settings().SetTheme(brickbreaker.NewTheme())
+				w.SetTitle("Flappy Gophy")
+				if gophyScreen == nil {
+					gophyScreen = flappygophy.NewScreen(w, a.Preferences(), showMenu)
+				}
+				gophyScreen.Show()
+			},
 		}})
 	w.Resize(fyne.NewSize(640, 600))
 	showMenu()
@@ -97,6 +115,9 @@ func main() {
 		}
 		if flappyScreen != nil {
 			flappyScreen.Pause()
+		}
+		if gophyScreen != nil {
+			gophyScreen.Pause()
 		}
 	})
 	w.ShowAndRun()

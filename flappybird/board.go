@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/xdung24/game/internal/navigation"
+	"github.com/xdung24/games/internal/navigation"
 )
 
 //go:embed Icon.svg

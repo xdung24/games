@@ -7,7 +7,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"github.com/ebitengine/oto/v3"
-	"github.com/xdung24/game/internal/audio"
+	"github.com/xdung24/games/internal/audio"
 )
 
 type soundPlayer struct {

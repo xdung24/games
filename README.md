@@ -10,8 +10,9 @@ go run .
 
 The app opens on a game-selection menu with up to 10 games per page. Use
 **Previous** and **Next** to change pages, then tap anywhere on a game card to
-open it. Brick Breaker, Star Breaker, and Flappy Bird are available. Select the
-back arrow (beside **SCORE** in the breaker games, bottom-left in Flappy Bird) to
+open it. Brick Breaker, Star Breaker, Flappy Bird, and Flappy Gophy are available.
+Select the back arrow (beside **SCORE** in the breaker games, bottom-left in the
+flappy games) to
 return to the menu; each game is paused and kept for when you return.
 You can also press **Esc** to pause, then press **Esc** again to return Home.
 Other input cancels this two-press sequence.
@@ -25,8 +26,9 @@ keyboard focus. Use **Up/Down** to select a game, **Left/Right** to change pages
 and **Enter** or **Space** to play. **Tab** also moves keyboard focus.
 The selected card stays visible and is restored when you return to the menu.
 
-The root `main` package owns the launcher and menu. The `brickbreaker` and
-`starbreaker` and `flappybird` directories are importable game packages; each owns its rendering,
+The root `main` package owns the launcher and menu. The `brickbreaker`,
+`starbreaker`, `flappybird`, and `flappygophy` directories are importable game
+packages; each owns its rendering,
 audio, and simulation loop. They share one audio device through `internal/audio`.
 The launcher uses `NewScreen`, `Show`, and `Pause` to manage each game without
 accessing its internal state. Run build and package commands from the repository root.
@@ -113,3 +115,13 @@ The [Felgo reference](https://github.com/FelgoSDK/FlappyBird) was consulted for
 gameplay mechanics. Its license excludes redistribution of the supplied artwork
 and audio, so this implementation uses only original vector artwork and
 synthesized sounds, with no copied reference assets or source code.
+
+## Flappy Gophy
+
+Tap/click or press **Space**, **Enter**, or **Up** to start and flap. Guide the
+Gopher through the pipes and avoid the ceiling and ground. After game over,
+use the same controls to retry. Best scores are saved separately from Flappy Bird.
+
+Use the bottom-right button to pause/resume and the bottom-left arrow to return
+Home. **Esc** pauses; a second separate **Esc** returns Home. Returning to the
+game preserves the paused round. It also pauses when the app leaves the foreground.

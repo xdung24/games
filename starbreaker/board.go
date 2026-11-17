@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/xdung24/game/internal/navigation"
+	"github.com/xdung24/games/internal/navigation"
 )
 
 // Neon palette. Entities are bright, saturated strokes on the dark shader sky;
