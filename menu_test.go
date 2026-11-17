@@ -57,10 +57,10 @@ func TestConfiguredGamesForPlatform(t *testing.T) {
 		targetOS string
 		want     []string
 	}{
-		{"windows", []string{"Asteroid Shooter", "Brick Breaker", "Bombsweeper", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria"}},
-		{"android", []string{"Asteroid Shooter", "Brick Breaker", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria"}},
-		{"ios", []string{"Asteroid Shooter", "Brick Breaker", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria"}},
-		{"js", []string{"Asteroid Shooter", "Brick Breaker", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria"}},
+		{"windows", []string{"Asteroid Shooter", "Brick Breaker", "Bombsweeper", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria", "Acorn Run"}},
+		{"android", []string{"Asteroid Shooter", "Brick Breaker", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria", "Acorn Run"}},
+		{"ios", []string{"Asteroid Shooter", "Brick Breaker", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria", "Acorn Run"}},
+		{"js", []string{"Asteroid Shooter", "Brick Breaker", "CroakCross", "Flappy Chick", "Flappy Gophy", "Moria", "Acorn Run"}},
 	} {
 		t.Run(tt.targetOS, func(t *testing.T) {
 			entries, _ := newGameEntries(app, window, func() {}, tt.targetOS)

@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
+	acornrun "github.com/xdung24/games/acornrun"
 	asteroidshooter "github.com/xdung24/games/asteroidshooter"
 	bombsweeper "github.com/xdung24/games/bombsweeper"
 	brickbreaker "github.com/xdung24/games/brickbreaker"
@@ -15,6 +16,10 @@ import (
 	flappygophy "github.com/xdung24/games/flappygophy"
 	"github.com/xdung24/games/moria"
 )
+
+//go:embed acornrun/Icon.svg
+var acornRunIconSVG []byte
+var acornRunIcon = fyne.NewStaticResource("acorn-run-Icon.svg", acornRunIconSVG)
 
 //go:embed moria/Icon.svg
 var moriaIconSVG []byte
@@ -65,6 +70,7 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 	var flappyScreen *flappychick.Screen
 	var gophyScreen *flappygophy.Screen
 	var moriaScreen *moria.Screen
+	var acornRunScreen *acornrun.Screen
 
 	entries := []gameEntry{
 		{
@@ -183,6 +189,22 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 				moriaScreen.Show()
 			},
 		},
+		{
+			name:        "Acorn Run",
+			description: "Guide a woodland courier, gather acorns, and find the treehouse.",
+			icon:        acornRunIcon,
+			isDesktop:   true,
+			isMobile:    true,
+			isWeb:       true,
+			play: func() {
+				a.Settings().SetTheme(acornrun.NewTheme())
+				w.SetTitle("Acorn Run")
+				if acornRunScreen == nil {
+					acornRunScreen = acornrun.NewScreen(w, a.Preferences(), showMenu)
+				}
+				acornRunScreen.Show()
+			},
+		},
 	}
 
 	pauseGames := func() {
@@ -203,6 +225,9 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 		}
 		if moriaScreen != nil {
 			moriaScreen.Pause()
+		}
+		if acornRunScreen != nil {
+			acornRunScreen.Pause()
 		}
 	}
 

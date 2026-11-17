@@ -2,8 +2,8 @@
 Icon = "Icon.png"
 Name = "Retro game collection"
 ID = "com.dungle.retrogames"
-Version = "0.0.5"
-Build = 5
+Version = "0.0.6"
+Build = 6
 
 [LinuxAndBSD]
 Categories = ["Game"]
