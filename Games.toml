@@ -1,0 +1,12 @@
+[Details]
+Icon = "Icon.png"
+Name = "game"
+ID = "com.dungle.game"
+Version = "0.0.1"
+Build = 1
+
+[LinuxAndBSD]
+Categories = ["Game"]
+
+[Migrations]
+fyneDo = true
