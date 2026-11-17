@@ -1,5 +1,5 @@
 [build]
-  command = "GOOS=js GOARCH=wasm go build -tags release -ldflags="-s -w" -o web/games.wasm ."
+  command = "GOOS=js GOARCH=wasm go build -tags='release' -ldflags='-s -w' -o web/games.wasm ."
   publish = "web"
 
 [build.environment]
