@@ -13,7 +13,12 @@ import (
 	croakcross "github.com/xdung24/games/croakcross"
 	flappychick "github.com/xdung24/games/flappychick"
 	flappygophy "github.com/xdung24/games/flappygophy"
+	"github.com/xdung24/games/moria"
 )
+
+//go:embed moria/Icon.svg
+var moriaIconSVG []byte
+var moriaIcon = fyne.NewStaticResource("moria-Icon.svg", moriaIconSVG)
 
 //go:embed Icon.png
 var homeIconPNG []byte
@@ -59,6 +64,7 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 	var croakcrossScreen *croakcross.Screen
 	var flappyScreen *flappychick.Screen
 	var gophyScreen *flappygophy.Screen
+	var moriaScreen *moria.Screen
 
 	entries := []gameEntry{
 		{
@@ -161,6 +167,22 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 				gophyScreen.Show()
 			},
 		},
+		{
+			name:        "Moria",
+			description: "Explore the crystal caverns, gather gems, and find the ancient gate.",
+			icon:        moriaIcon,
+			isDesktop:   true,
+			isMobile:    true,
+			isWeb:       true,
+			play: func() {
+				a.Settings().SetTheme(moria.NewTheme())
+				w.SetTitle("Moria")
+				if moriaScreen == nil {
+					moriaScreen = moria.NewScreen(w, a.Preferences(), showMenu)
+				}
+				moriaScreen.Show()
+			},
+		},
 	}
 
 	pauseGames := func() {
@@ -178,6 +200,9 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 		}
 		if gophyScreen != nil {
 			gophyScreen.Pause()
+		}
+		if moriaScreen != nil {
+			moriaScreen.Pause()
 		}
 	}
 
