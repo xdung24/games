@@ -20,6 +20,15 @@ The game ends when your lives run out.
 | `R` | Restart |
 | `M` | Mute / unmute the sound |
 
+On mobile and touch-capable browsers, the Go/Fyne game UI provides left and right
+arrows floating over the lower playfield, above the paddle. Hold either to steer.
+These translucent SVG controls reserve no footer and are not obstacles: the ball
+passes through them normally. Touching a control does not launch or pause the ball.
+Releasing or cancelling a touch stops that direction;
+leaving the game releases both controls. Tap the playfield to launch, pause,
+resume, or play again. Finger dragging and physical keyboard controls still work.
+The browser shell does not create controls or send gameplay key events.
+
 ## How it plays
 
 - **Three lives.** Lose one whenever the ball slips past your paddle. At zero, it's game over.

@@ -1,4 +1,4 @@
-package starbreaker
+package asteroidshooter
 
 import (
 	"bytes"
@@ -58,7 +58,7 @@ func newSoundPlayer() *soundPlayer {
 
 	ctx, err := audio.Context()
 	if err != nil {
-		fyne.LogError("Star Breaker audio is unavailable", err)
+		fyne.LogError("Asteroid Shooter audio is unavailable", err)
 		return sp // disabled: no audio device
 	}
 	sp.ctx = ctx

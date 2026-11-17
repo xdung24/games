@@ -14,25 +14,25 @@ dependency versions declared in [go.mod](../go.mod).
   and restoration of canvas key handlers.
 - [card.go](../card.go): clickable game cards, accessibility, keyboard activation,
   and animated hover/focus highlights.
-- [brickbreaker/](../brickbreaker) and [starbreaker/](../starbreaker): importable
+- [brickbreaker/](../brickbreaker) and [asteroidshooter/](../asteroidshooter): importable
   game packages, not standalone applications.
   - `game.go`: simulation, state transitions, physics, and sound-event callbacks.
   - `board.go`: Fyne widget, input handling, HUD, and canvas renderer.
   - `screen.go`: session ownership, navigation, focus, and simulation loop.
   - `sound.go`: synthesized effects and per-game mute handling.
   - `theme.go`: game-specific theme.
-  - Star Breaker's `shaders.go`: desktop and OpenGL ES background shaders.
+  - Asteroid Shooter's `shaders.go`: desktop and OpenGL ES background shaders.
 - [flappychick/](../flappychick): reference for lightweight retained rendering,
   elapsed-time simulation, and skipping redraws outside active play.
 - [flappygophy/](../flappygophy): simulation/input in `main.go`, reusable visual
   objects in `scene.go`, and session/HUD management in `screen.go`.
 - [internal/audio/](../internal/audio): the shared Oto audio context.
 - [internal/navigation/](../internal/navigation): shared double-Esc handling.
-- [internal/browserinput/](../internal/browserinput): browser touch-control
-  integration, with no-op implementations for native builds.
+- [internal/touchcontrols/](../internal/touchcontrols): Go/Fyne SVG buttons,
+  held-touch tracking, game-screen layout, and platform pointer translation.
 - [index.html](../index.html): full-window iframe loading `web/index.html`.
-- [web/](../web): checked-in browser shell, zoom/keyboard restrictions, and
-  multi-touch controls in `mobile.js`/`mobile.css`; only the WASM binary is generated.
+- [web/](../web): checked-in loading shell and browser-only zoom/keyboard
+  protections. `mobile.js` must not implement gameplay; only WASM is generated.
 - [Games.toml](../Games.toml): application metadata; the launcher currently
   registers games explicitly in `main.go`, not by reading this file.
 
@@ -124,12 +124,22 @@ dependency versions declared in [go.mod](../go.mod).
 
 ## Mobile experience requirements
 
+- Implement game controls in Go, inside each game's Fyne screen/board. Reuse
+  `internal/touchcontrols` for SVG button rendering, held touches, and layout.
+  Bind controls directly to Go actions/model input, never to synthetic key events.
+- Keep HTML/JavaScript restricted to loading WASM and browser configuration
+  (viewport, zoom protection, and suppressing the on-screen keyboard).
+  Never create gameplay DOM buttons, track game input/state, or dispatch game
+  keyboard events in `mobile.js` or other browser-shell assets.
+- If a Fyne platform driver lacks multi-touch dispatch, keep the minimal pointer
+  adapter in Go behind build tags. Route pointer IDs to the actual Go widgets;
+  do not duplicate widget geometry or game behavior in JavaScript.
 - Keep all games playable without a physical keyboard. Use tap/drag when that
   already provides complete control; add virtual buttons only for otherwise
-  inaccessible actions, as in Star Breaker.
-- Support simultaneous held actions such as steering, thrust, and firing.
-  Use pointer capture and track individual touches; releasing one finger must
-  not release an action still held by another.
+  inaccessible actions, as in Asteroid Shooter.
+- Support simultaneous held actions such as steering, thrust, and firing through
+  Go widget touch IDs and pointer capture where needed. Releasing one finger
+  must not release another finger or a held physical keyboard action.
 - Release held controls on pointer-up, cancellation, lost capture, blur,
   visibility loss, and navigation. Pause through the existing lifecycle.
   Prevent touch controls from also activating the game underneath them.
@@ -143,6 +153,9 @@ dependency versions declared in [go.mod](../go.mod).
 - Test narrow phone layouts, landscape, touch dragging, rapid taps, multi-touch,
   pause/resume, and returning Home. Avoid accidental zoom, page scrolling,
   context menus, duplicate actions, and stuck controls.
+- Test Go control widgets and game action bindings with Fyne's headless helpers,
+  then validate the release WASM with real browser touches. Verify direct system
+  actions (pause/restart/mute), not just delivery of keyboard events.
 
 ## Audio and browser compatibility
 

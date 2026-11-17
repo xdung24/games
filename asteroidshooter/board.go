@@ -1,4 +1,4 @@
-package starbreaker
+package asteroidshooter
 
 import (
 	"fmt"
@@ -50,10 +50,12 @@ type Board struct {
 	renderer       *boardRenderer
 	backgroundTime float32
 
-	toggleMute func() bool
-	muted      func() bool
-	onBack     func()
-	escape     navigation.EscapeHandler
+	toggleMute  func() bool
+	muted       func() bool
+	onBack      func()
+	escape      navigation.EscapeHandler
+	keys, touch heldControls
+	onFocusLost func()
 }
 
 func NewBoard(g *Game) *Board {
@@ -115,10 +117,11 @@ func (b *Board) Tapped(*fyne.PointEvent) {
 func (b *Board) FocusGained() {}
 func (b *Board) FocusLost() {
 	b.escape.Reset()
-	b.game.leftHeld = false
-	b.game.rightHeld = false
-	b.game.thrustHeld = false
-	b.game.fireHeld = false
+	b.keys, b.touch = heldControls{}, heldControls{}
+	if b.onFocusLost != nil {
+		b.onFocusLost()
+	}
+	b.syncHeld()
 	b.game.ship.thrust = false
 }
 func (b *Board) TypedRune(rune) { b.escape.Reset() }
@@ -132,51 +135,41 @@ func (b *Board) TypedKey(e *fyne.KeyEvent) {
 	}
 	switch e.Name {
 	case fyne.KeyP:
-		b.game.TogglePause()
+		b.pause()
 	case fyne.KeyR:
-		b.game.StartGame()
+		b.restart()
 	case fyne.KeyM:
-		if b.toggleMute != nil {
-			b.toggleMute()
-			b.Refresh() // update the HUD indicator immediately
-		}
+		b.mute()
 	}
 }
 
 func (b *Board) KeyDown(e *fyne.KeyEvent) {
 	switch e.Name {
 	case fyne.KeyLeft, fyne.KeyA:
-		b.game.leftHeld = true
+		b.keys.left = true
 	case fyne.KeyRight, fyne.KeyD:
-		b.game.rightHeld = true
+		b.keys.right = true
 	case fyne.KeyUp, fyne.KeyW:
-		b.game.thrustHeld = true
-	case fyne.KeyDown, fyne.KeyH:
-		b.game.Hyperspace()
+		b.keys.thrust = true
 	case fyne.KeySpace:
-		// Space starts a game from the menus, and fires (auto-repeat) in play.
-		switch b.game.state {
-		case StatePlaying:
-			b.game.fireHeld = true
-			b.game.Fire()
-		default:
-			b.game.Activate()
-		}
+		b.pressFire(false)
 	}
+	b.syncHeld()
 }
 
 func (b *Board) KeyUp(e *fyne.KeyEvent) {
 	b.escape.KeyUp(e.Name)
 	switch e.Name {
 	case fyne.KeyLeft, fyne.KeyA:
-		b.game.leftHeld = false
+		b.keys.left = false
 	case fyne.KeyRight, fyne.KeyD:
-		b.game.rightHeld = false
+		b.keys.right = false
 	case fyne.KeyUp, fyne.KeyW:
-		b.game.thrustHeld = false
+		b.keys.thrust = false
 	case fyne.KeySpace:
-		b.game.fireHeld = false
+		b.keys.fire = false
 	}
+	b.syncHeld()
 }
 
 type neonPolygon struct {
@@ -435,7 +428,7 @@ func (r *boardRenderer) refreshBanner() {
 	switch g.state {
 	case StateAttract:
 		title = "STARBREAKER"
-		sub = "Rotate: Left / Right     Thrust: Up     Fire: Space     Hyperspace: H\nPress Space or click to play"
+		sub = "Rotate: Left / Right     Thrust: Up     Fire: Space\nPress Space or click to play"
 	case StatePaused:
 		r.overlay.Show()
 		title = "PAUSED"

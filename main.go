@@ -6,26 +6,31 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
+	asteroidshooter "github.com/xdung24/games/asteroidshooter"
 	brickbreaker "github.com/xdung24/games/brickbreaker"
 	flappychick "github.com/xdung24/games/flappychick"
 	flappygophy "github.com/xdung24/games/flappygophy"
-	browserinput "github.com/xdung24/games/internal/browserinput"
-	starbreaker "github.com/xdung24/games/starbreaker"
 )
 
 //go:embed Icon.png
 var homeIconPNG []byte
+var homeIcon = fyne.NewStaticResource("Home-Icon.png", homeIconPNG)
+
+//go:embed asteroidshooter/Icon.png
+var asteroidShooterIconPNG []byte
+var asteroidShooterIcon = fyne.NewStaticResource("asteroid-shooter-Icon.png", asteroidShooterIconPNG)
 
 //go:embed brickbreaker/Icon.png
 var brickBreakerIconPNG []byte
-
-//go:embed starbreaker/Icon.png
-var starBreakerIconPNG []byte
+var brickBreakerIcon = fyne.NewStaticResource("brick-breaker-Icon.png", brickBreakerIconPNG)
 
 //go:embed flappygophy/Icon.png
 var flappyGophyIconPNG []byte
+var flappyGophyIcon = fyne.NewStaticResource("flappy-gophy-Icon.png", flappyGophyIconPNG)
 
-var homeIcon = fyne.NewStaticResource("Icon.png", homeIconPNG)
+//go:embed flappychick/Icon.svg
+var flappyChickIconPNG []byte
+var flappyChickIcon = fyne.NewStaticResource("flappy-chick-Icon.svg", flappyChickIconPNG)
 
 type gameEntry struct {
 	name        string
@@ -42,11 +47,10 @@ func main() {
 
 	var menu *gameMenu
 	var brickScreen *brickbreaker.Screen
-	var starScreen *starbreaker.Screen
+	var asteroidshooterScreen *asteroidshooter.Screen
 	var flappyScreen *flappychick.Screen
 	var gophyScreen *flappygophy.Screen
 	showMenu := func() {
-		browserinput.Show("")
 		a.Settings().SetTheme(brickbreaker.NewTheme())
 		w.SetTitle("Play game")
 		menu.Show(w)
@@ -54,11 +58,23 @@ func main() {
 
 	menu = newGameMenu([]gameEntry{
 		{
+			name:        "Asteroid Shooter",
+			description: "Destroy the stars and reach the highest score.",
+			icon:        asteroidShooterIcon,
+			play: func() {
+				a.Settings().SetTheme(asteroidshooter.NewTheme())
+				w.SetTitle("Asteroid Shooter")
+				if asteroidshooterScreen == nil {
+					asteroidshooterScreen = asteroidshooter.NewScreen(w, a.Preferences(), showMenu)
+				}
+				asteroidshooterScreen.Show()
+			},
+		},
+		{
 			name:        "Brick Breaker",
 			description: "Keep the ball in play and break the ocean-blue blocks.",
-			icon:        fyne.NewStaticResource("brick-breaker-Icon.png", brickBreakerIconPNG),
+			icon:        brickBreakerIcon,
 			play: func() {
-				browserinput.Show("")
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Brick Breaker")
 				if brickScreen == nil {
@@ -68,25 +84,10 @@ func main() {
 			},
 		},
 		{
-			name:        "Star Breaker",
-			description: "Destroy the stars and reach the highest score.",
-			icon:        fyne.NewStaticResource("star-breaker-Icon.png", starBreakerIconPNG),
-			play: func() {
-				browserinput.Show("starbreaker")
-				a.Settings().SetTheme(starbreaker.NewTheme())
-				w.SetTitle("Star Breaker")
-				if starScreen == nil {
-					starScreen = starbreaker.NewScreen(w, a.Preferences(), showMenu)
-				}
-				starScreen.Show()
-			},
-		},
-		{
 			name:        "Flappy Chick",
 			description: "Tap to flap, slip through the pipes, and beat your best score.",
-			icon:        flappychick.Icon,
+			icon:        flappyChickIcon,
 			play: func() {
-				browserinput.Show("")
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Flappy Chick")
 				if flappyScreen == nil {
@@ -98,9 +99,8 @@ func main() {
 		{
 			name:        "Flappy Gophy",
 			description: "Guide a hyperactive Gopher through the pipes.",
-			icon:        fyne.NewStaticResource("flappy-gophy-Icon.png", flappyGophyIconPNG),
+			icon:        flappyGophyIcon,
 			play: func() {
-				browserinput.Show("")
 				a.Settings().SetTheme(brickbreaker.NewTheme())
 				w.SetTitle("Flappy Gophy")
 				if gophyScreen == nil {
@@ -109,15 +109,16 @@ func main() {
 				gophyScreen.Show()
 			},
 		}})
+
 	w.Resize(fyne.NewSize(640, 600))
 	showMenu()
 
 	a.Lifecycle().SetOnExitedForeground(func() {
+		if asteroidshooterScreen != nil {
+			asteroidshooterScreen.Pause()
+		}
 		if brickScreen != nil {
 			brickScreen.Pause()
-		}
-		if starScreen != nil {
-			starScreen.Pause()
 		}
 		if flappyScreen != nil {
 			flappyScreen.Pause()

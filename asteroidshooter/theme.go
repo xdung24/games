@@ -1,4 +1,4 @@
-package starbreaker
+package asteroidshooter
 
 import (
 	"image/color"

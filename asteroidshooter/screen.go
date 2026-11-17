@@ -1,41 +1,39 @@
-package starbreaker
+package asteroidshooter
 
 import (
-	"image/color"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
-	"github.com/xdung24/games/internal/browserinput"
+	"github.com/xdung24/games/internal/touchcontrols"
 )
 
 // Screen owns a game session and preserves its progress between menu visits.
 type Screen struct {
-	window  fyne.Window
-	game    *Game
-	board   *Board
-	content fyne.CanvasObject
+	window   fyne.Window
+	game     *Game
+	board    *Board
+	content  fyne.CanvasObject
+	controls *touchcontrols.Panel
 }
 
 // NewScreen creates a game session, initially hidden until Show is called.
 func NewScreen(w fyne.Window, preferences fyne.Preferences, onBack func()) *Screen {
 	game := NewGame()
 	sound := newSoundPlayer()
-	sound.SetMuted(preferences.Bool("starbreaker.sound.muted"))
+	sound.SetMuted(preferences.Bool("asteroidshooter.sound.muted"))
 	game.onSound = sound.Play
 	board := NewBoard(game)
 	board.muted = sound.IsMuted
 	board.toggleMute = func() bool {
 		muted := sound.ToggleMuted()
-		preferences.SetBool("starbreaker.sound.muted", muted)
+		preferences.SetBool("asteroidshooter.sound.muted", muted)
 		return muted
 	}
 	s := &Screen{window: w, game: game, board: board, content: board}
-	if height := browserinput.ControlsHeight(); height > 0 {
-		space := canvas.NewRectangle(color.Transparent)
-		space.SetMinSize(fyne.NewSize(0, height))
-		s.content = container.NewBorder(nil, space, nil, nil, board)
+	if touchcontrols.Enabled() {
+		s.controls = s.newControls(board)
+		s.content = s.controls
+		board.onFocusLost = s.controls.Reset
 	}
 	board.onBack = func() {
 		s.Hide()
@@ -51,6 +49,9 @@ func (s *Screen) Show() {
 	s.board.Show()
 	s.window.SetContent(s.content)
 	s.window.Canvas().Focus(s.board)
+	if s.controls != nil {
+		s.controls.Attach()
+	}
 }
 
 // Pause freezes play when the application leaves the foreground.
@@ -65,6 +66,9 @@ func (s *Screen) Pause() {
 // Hide pauses the session before returning to the menu.
 func (s *Screen) Hide() {
 	s.Pause()
+	if s.controls != nil {
+		s.controls.Detach()
+	}
 	s.board.Hide()
 }
 

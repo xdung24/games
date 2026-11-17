@@ -1,4 +1,4 @@
-package starbreaker
+package asteroidshooter
 
 import "fyne.io/fyne/v2/canvas"
 
@@ -110,7 +110,7 @@ precision mediump int;
 
 // newNeonBackground builds the nebula shader, driven by the game loop's clock.
 func newNeonBackground() *canvas.Shader {
-	s := canvas.NewShader("starbreaker-neon", []byte(neonFragCore), []byte(neonFragES))
+	s := canvas.NewShader("asteroidshooter-neon", []byte(neonFragCore), []byte(neonFragES))
 	s.Uniforms = map[string]float32{"time": 0}
 	return s
 }

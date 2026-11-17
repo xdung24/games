@@ -143,26 +143,25 @@ func (b *Board) CreateRenderer() fyne.WidgetRenderer {
 		}
 	})
 	r.pause = widget.NewButtonWithIcon("", theme.MediaPauseIcon(), b.pause)
-	r.restart = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), b.restart)
 	r.mute = widget.NewButtonWithIcon("", theme.VolumeUpIcon(), b.toggleMute)
 	b.renderer = r
 	return r
 }
 
 type boardRenderer struct {
-	board                      *Board
-	scale, ox, oy              float32
-	surround, sky              *canvas.Rectangle
-	clouds                     [9]*canvas.Circle
-	pipes                      [3][4]*canvas.Rectangle
-	ground, grass              *canvas.Rectangle
-	stripes                    [19]*canvas.Rectangle
-	bird                       *canvas.Image
-	wing                       *canvas.Circle
-	score, best                *canvas.Text
-	veil                       *canvas.Rectangle
-	title, hint, detail        *canvas.Text
-	back, pause, restart, mute *widget.Button
+	board               *Board
+	scale, ox, oy       float32
+	surround, sky       *canvas.Rectangle
+	clouds              [9]*canvas.Circle
+	pipes               [3][4]*canvas.Rectangle
+	ground, grass       *canvas.Rectangle
+	stripes             [19]*canvas.Rectangle
+	bird                *canvas.Image
+	wing                *canvas.Circle
+	score, best         *canvas.Text
+	veil                *canvas.Rectangle
+	title, hint, detail *canvas.Text
+	back, pause, mute   *widget.Button
 }
 
 func (r *boardRenderer) MinSize() fyne.Size { return fyne.NewSize(320, 480) }
@@ -206,7 +205,7 @@ func (r *boardRenderer) Objects() []fyne.CanvasObject {
 		objects = append(objects, stripe)
 	}
 	return append(objects, r.bird, r.wing, r.veil, r.score, r.best,
-		r.title, r.hint, r.detail, r.back, r.pause, r.restart, r.mute)
+		r.title, r.hint, r.detail, r.back, r.pause, r.mute)
 }
 
 func (r *boardRenderer) centered(t *canvas.Text, y float32) {
@@ -280,11 +279,11 @@ func (r *boardRenderer) Refresh() {
 	r.centered(r.hint, 245)
 	r.centered(r.detail, 282)
 
-	buttons := []*widget.Button{r.back, r.pause, r.restart, r.mute}
+	buttons := []*widget.Button{r.back, r.pause, r.mute}
 	for i, button := range buttons {
 		size := button.MinSize()
 		button.Resize(size)
-		button.Move(fyne.NewPos(r.ox+(25+float32(i)*87)*r.scale,
+		button.Move(fyne.NewPos(r.ox+25*r.scale+float32(i)*((worldWidth-50)*r.scale-size.Width)/2,
 			r.oy+worldHeight*r.scale-size.Height-8*r.scale))
 	}
 	pauseIcon := theme.MediaPauseIcon()

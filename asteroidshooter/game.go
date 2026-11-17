@@ -1,4 +1,4 @@
-package starbreaker
+package asteroidshooter
 
 import (
 	"math"
@@ -338,17 +338,6 @@ func (g *Game) Fire() {
 	})
 	g.fireCool = fireCooldown
 	g.play(SoundFire)
-}
-
-// Hyperspace jumps the ship to a random spot — an escape hatch that drops all
-// momentum and protection, so it can also drop you onto a rock.
-func (g *Game) Hyperspace() {
-	if g.state != StatePlaying || !g.ship.alive {
-		return
-	}
-	g.ship.pos = vec{g.randRange(0, g.w), g.randRange(0, g.h)}
-	g.ship.vel = vec{}
-	g.ship.invuln = 0.4
 }
 
 // TogglePause flips between Playing and Paused.

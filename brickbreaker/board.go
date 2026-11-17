@@ -32,6 +32,8 @@ type Board struct {
 	onToggleMute func() // toggles sound muting; nil = no-op
 	onBack       func()
 	escape       navigation.EscapeHandler
+	keys, touch  heldControls
+	onFocusLost  func()
 }
 
 func NewBoard(g *Game) *Board {
@@ -130,8 +132,11 @@ func (b *Board) activate() {
 func (b *Board) FocusGained() {}
 func (b *Board) FocusLost() {
 	b.escape.Reset()
-	b.game.leftHeld = false
-	b.game.rightHeld = false
+	b.keys, b.touch = heldControls{}, heldControls{}
+	if b.onFocusLost != nil {
+		b.onFocusLost()
+	}
+	b.syncHeld()
 }
 func (b *Board) TypedRune(rune) { b.escape.Reset() }
 
@@ -159,20 +164,22 @@ func (b *Board) TypedKey(e *fyne.KeyEvent) {
 func (b *Board) KeyDown(e *fyne.KeyEvent) {
 	switch e.Name {
 	case fyne.KeyLeft, fyne.KeyA:
-		b.game.leftHeld = true
+		b.keys.left = true
 	case fyne.KeyRight, fyne.KeyD:
-		b.game.rightHeld = true
+		b.keys.right = true
 	}
+	b.syncHeld()
 }
 
 func (b *Board) KeyUp(e *fyne.KeyEvent) {
 	b.escape.KeyUp(e.Name)
 	switch e.Name {
 	case fyne.KeyLeft, fyne.KeyA:
-		b.game.leftHeld = false
+		b.keys.left = false
 	case fyne.KeyRight, fyne.KeyD:
-		b.game.rightHeld = false
+		b.keys.right = false
 	}
+	b.syncHeld()
 }
 
 // boardRenderer maps game state onto canvas objects every frame.

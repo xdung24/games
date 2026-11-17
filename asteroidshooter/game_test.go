@@ -1,4 +1,4 @@
-package starbreaker
+package asteroidshooter
 
 import (
 	"math"
@@ -214,24 +214,6 @@ func TestExtraLifeAtThreshold(t *testing.T) {
 	g.addScore(extraLifeEvery)
 	if g.lives != lives+1 {
 		t.Fatalf("lives = %d, want %d after crossing the bonus threshold", g.lives, lives+1)
-	}
-}
-
-func TestHyperspaceMovesShip(t *testing.T) {
-	g := newPlayingGame()
-	before := g.ship.pos
-	moved := false
-	for i := 0; i < 20 && !moved; i++ {
-		g.Hyperspace()
-		if g.ship.pos != before {
-			moved = true
-		}
-	}
-	if !moved {
-		t.Fatal("hyperspace should relocate the ship")
-	}
-	if g.ship.vel != (vec{}) {
-		t.Fatal("hyperspace should zero the ship's momentum")
 	}
 }
 

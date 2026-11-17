@@ -26,6 +26,11 @@ The generated `web/games.wasm` binary is ignored by Git.
 After rebuilding an older debug package, reload the browser with `Ctrl+F5`
 to avoid cached assets. Keep browser hardware acceleration enabled.
 
+Mobile gameplay controls are SVG widgets rendered by the Go/Fyne games, not
+HTML buttons. Brick Breaker has floating left/right controls above its paddle; Star
+Breaker separates steering, thrust/fire, and system actions. The browser
+shell only loads WASM and configures viewport, zoom, and keyboard protections.
+
 ## Deploy to web
 
 Upload the generated `wasm` directory contents to your host and serve them over
@@ -33,7 +38,7 @@ HTTP(S); do not open the HTML file directly. Configure the host to serve
 `.wasm` files as `application/wasm`.
 
 Netlify uses `netlify.toml` to build the app and publish the checked-in `web`
-shell, including the mobile controls described above.
+loading shell. Game UI and input handling remain in the Go application.
 
 Alternatively, deploy `index.html` alongside the `web` directory, keeping that
 directory structure, and include `Icon.png` for the page icon.

@@ -11,21 +11,23 @@ hunting saucer, and clear wave after escalating wave.
 | `←` `→` / `A` `D` | Rotate the ship |
 | `↑` / `W` | Thrust (momentum carries you) |
 | `Space` | Fire · start · play again |
-| `H` / `↓` | Hyperspace — jump to a random spot (no protection!) |
 | `P` | Pause / resume |
 | `Esc`, then `Esc` again | Pause, then return to the Home menu |
 | `R` | Restart |
 | `M` | Mute / unmute (remembered between runs) |
 
 A tap or click also starts the game and fires.
-The custom browser build adds SVG-icon multi-touch controls on touch-capable
-devices. Left and Right sit at the bottom-left, Jump sits at the bottom-center,
-and Thrust and Fire sit at the bottom-right. Hold steering, thrust,
-and fire simultaneously to steer and shoot. Pause, Restart, and Mute form a
-separate top-right group below the HUD. Icons retain accessible names and tooltips.
+The Go/Fyne game UI provides SVG-icon multi-touch controls on mobile and
+touch-capable browsers. Left and Right sit at the bottom-left,
+and Thrust and Fire sit at the bottom-right. The nebula fills the screen behind
+the buttons, with no solid bottom control strip. Hold steering, thrust,
+and fire simultaneously to steer and shoot. Pause sits above Mute in a
+vertical top-right group below the HUD. There is no replay button; use **R**
+to restart. Pause and Mute call the Go game directly rather than relying on
+browser letter-key mapping.
 Select the small back arrow beside **SCORE** to return to the launcher.
 Your session is paused and preserved;
-opening Star Breaker again restores it. Run `go run .` from the repository root,
+opening Asteroid Shooter again restores it. Run `go run .` from the repository root,
 not from this directory.
 
 ## How it plays
@@ -54,11 +56,15 @@ stops animation, while the attract screen still has drifting rocks and stars.
 Run the renderer allocation benchmark with:
 
 ```sh
-go test -tags "ci migrated_fynedo" ./starbreaker -run '^$' -bench BenchmarkBoardRefresh -benchmem
+go test -tags "ci migrated_fynedo" ./asteroidshooter -run '^$' -bench BenchmarkBoardRefresh -benchmem
 ```
 
 The benchmark covers 5 or 30 rocks plus 80 particles. It measures scene updates,
 not GPU painting or browser FPS; verify active gameplay in a foreground release
 browser at phone dimensions and high DPI as well.
 
-Run the browser touch-input regressions with `node --test web/mobile.test.cjs`.
+Run the Go control regressions with:
+
+```sh
+go test -tags "ci migrated_fynedo" ./internal/touchcontrols ./brickbreaker ./asteroidshooter
+```

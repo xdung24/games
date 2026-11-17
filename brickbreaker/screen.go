@@ -23,6 +23,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/xdung24/games/internal/touchcontrols"
 )
 
 const targetFPS = 60
@@ -31,10 +32,11 @@ const prefKeyMuted = "sound.muted"
 
 // Screen owns the game view and preserves its progress between menu visits.
 type Screen struct {
-	window  fyne.Window
-	game    *Game
-	board   *Board
-	content fyne.CanvasObject
+	window   fyne.Window
+	game     *Game
+	board    *Board
+	content  fyne.CanvasObject
+	controls *touchcontrols.Panel
 }
 
 // NewScreen creates one game session, initially hidden until Show is called.
@@ -66,6 +68,11 @@ func NewScreen(w fyne.Window, preferences fyne.Preferences, onBack func()) *Scre
 		window: w, game: game, board: board,
 		content: container.NewStack(board, overlay),
 	}
+	if touchcontrols.Enabled() {
+		s.controls = s.newControls(s.content)
+		s.content = s.controls
+		board.onFocusLost = s.controls.Reset
+	}
 	board.onBack = func() {
 		s.Hide()
 		onBack()
@@ -80,6 +87,9 @@ func (s *Screen) Show() {
 	s.board.Show()
 	s.window.SetContent(s.content)
 	s.window.Canvas().Focus(s.board)
+	if s.controls != nil {
+		s.controls.Attach()
+	}
 }
 
 // Pause freezes play when the application leaves the foreground.
@@ -94,6 +104,9 @@ func (s *Screen) Pause() {
 // Hide pauses the session and releases held controls before returning to a menu.
 func (s *Screen) Hide() {
 	s.Pause()
+	if s.controls != nil {
+		s.controls.Detach()
+	}
 	s.board.FocusLost()
 	s.board.Hide()
 }

@@ -1,4 +1,4 @@
-package starbreaker
+package asteroidshooter
 
 import (
 	"fmt"
@@ -8,9 +8,106 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/driver/mobile"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
+	"github.com/xdung24/games/internal/touchcontrols"
 )
+
+func TestGoTouchControlsBindHeldAndSystemActions(t *testing.T) {
+	a := test.NewApp()
+	defer a.Quit()
+	g := newPlayingGame()
+	b := NewBoard(g)
+	w := test.NewWindow(b)
+	defer w.Close()
+	s := &Screen{window: w, game: g, board: b}
+	s.controls = s.newControls(b)
+	s.content = s.controls
+	b.onFocusLost = s.controls.Reset
+	muted := false
+	b.toggleMute = func() bool { muted = !muted; return muted }
+	b.muted = func() bool { return muted }
+	s.Show()
+	if len(s.controls.Center) != 0 {
+		t.Fatal("Asteroid Shooter must not show a hyper jump button")
+	}
+	if len(s.controls.System) != 2 {
+		t.Fatal("Asteroid Shooter must only show Pause and Mute system buttons")
+	}
+	pause, mute := s.controls.System[0], s.controls.System[1]
+	left, thrust, fire := s.controls.Left[0], s.controls.Right[0], s.controls.Right[1]
+	for _, size := range []fyne.Size{fyne.NewSize(320, 568), fyne.NewSize(430, 740), fyne.NewSize(932, 430)} {
+		s.controls.Resize(size)
+		if b.Size() != size {
+			t.Fatalf("the game background must extend behind the controls at %v", size)
+		}
+		if pause.Position().X != mute.Position().X ||
+			pause.Position().X+pause.Size().Width != size.Width-8 ||
+			pause.Position().Y+pause.Size().Height >= mute.Position().Y ||
+			mute.Position().Y+mute.Size().Height > size.Height {
+			t.Fatalf("Pause must sit above Mute in a reachable top-right column at %v", size)
+		}
+		for _, button := range []*touchcontrols.Button{left, s.controls.Left[1], thrust, fire} {
+			if delta := button.Position().Y + button.Size().Height/2 - (size.Height - 56); delta < -0.01 || delta > 0.01 {
+				t.Fatalf("%s must keep its bottom-row position at %v", button.Name, size)
+			}
+		}
+	}
+	left.TouchDown(&mobile.TouchEvent{ID: 1})
+	thrust.TouchDown(&mobile.TouchEvent{ID: 2})
+	fire.TouchDown(&mobile.TouchEvent{ID: 3})
+	if !g.leftHeld || !g.thrustHeld || !g.fireHeld || len(g.bullets) != 1 {
+		t.Fatal("Go controls must allow steering, thrust and firing together")
+	}
+	left.TouchUp(&mobile.TouchEvent{ID: 1})
+	if g.leftHeld || !g.thrustHeld || !g.fireHeld {
+		t.Fatal("releasing steering must not release thrust or fire")
+	}
+	b.KeyDown(&fyne.KeyEvent{Name: fyne.KeyUp})
+	thrust.TouchCancel(&mobile.TouchEvent{ID: 2})
+	if !g.thrustHeld {
+		t.Fatal("touch cancellation must preserve keyboard thrust")
+	}
+	pause.TouchDown(&mobile.TouchEvent{ID: 5})
+	if g.state != StatePaused || g.thrustHeld || g.fireHeld {
+		t.Fatal("Pause must directly pause and release gameplay holds")
+	}
+	pause.TouchUp(&mobile.TouchEvent{ID: 5})
+	pause.TouchDown(&mobile.TouchEvent{ID: 6})
+	if g.state != StatePlaying {
+		t.Fatal("the same Go Pause control must resume")
+	}
+	g.score = 120
+	b.TypedKey(&fyne.KeyEvent{Name: fyne.KeyR})
+	if g.state != StatePlaying || g.score != 0 {
+		t.Fatal("the R shortcut must still start a new game without a replay button")
+	}
+	mute.TouchDown(&mobile.TouchEvent{ID: 8})
+	if !muted {
+		t.Fatal("Mute must call the Go sound toggle, without a keyboard event")
+	}
+	fire.TouchDown(&mobile.TouchEvent{ID: 9})
+	s.Hide()
+	if g.fireHeld || g.leftHeld || g.rightHeld || g.thrustHeld {
+		t.Fatal("hidden games must release every Go touch control")
+	}
+}
+
+func TestRemovedJumpKeysDoNotTeleportShip(t *testing.T) {
+	g := newPlayingGame()
+	g.ship.vel, g.ship.invuln = vec{20, 30}, 0
+	before := g.ship
+	b := NewBoard(g)
+	for _, key := range []fyne.KeyName{fyne.KeyH, fyne.KeyDown} {
+		event := &fyne.KeyEvent{Name: key}
+		b.KeyDown(event)
+		b.KeyUp(event)
+		if g.ship.pos != before.pos || g.ship.vel != before.vel || g.ship.invuln != before.invuln {
+			t.Fatalf("%s must not teleport the ship or change momentum or protection", key)
+		}
+	}
+}
 
 func BenchmarkBoardRefresh(b *testing.B) {
 	a := test.NewApp()

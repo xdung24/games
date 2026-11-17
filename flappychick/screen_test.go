@@ -97,7 +97,10 @@ func TestBoardResponsiveLayoutAndButtons(t *testing.T) {
 				t.Fatalf("overlay text must fit the playfield at %v", size)
 			}
 		}
-		buttons := []*widget.Button{r.back, r.pause, r.restart, r.mute}
+		buttons := []*widget.Button{r.back, r.pause, r.mute}
+		if math.Abs(float64(r.pause.Position().X+r.pause.Size().Width/2-b.Size().Width/2)) > 0.01 {
+			t.Fatalf("pause must be horizontally centered at %v", size)
+		}
 		for i, button := range buttons {
 			if button.Position().X < r.ox ||
 				button.Position().X+button.Size().Width > r.ox+worldWidth*r.scale ||
@@ -124,8 +127,10 @@ func TestBoardResponsiveLayoutAndButtons(t *testing.T) {
 	if g.state != StatePlaying || w.Canvas().Focused() != b {
 		t.Fatal("pause button must resume and restore board focus")
 	}
-	test.Tap(r.restart)
-	if g.state != StateReady {
-		t.Fatal("restart button must reset the round")
+	g.state, g.score = StateGameOver, 3
+	b.Refresh()
+	test.Tap(b)
+	if g.state != StatePlaying || g.score != 0 || g.vy != flapSpeed {
+		t.Fatal("tapping after game over must still reset the round without a replay button")
 	}
 }
