@@ -1,0 +1,12 @@
+[build]
+  command = "go install fyne.io/tools/cmd/fyne@latest && $(go env GOPATH)/bin/fyne package -os web"
+  publish = "wasm"
+
+[build.environment]
+  GO_VERSION = "1.26"
+
+[[headers]]
+  for = "/*.wasm"
+  [headers.values]
+    Content-Type = "application/wasm"
+    Cache-Control = "public, max-age=31536000, immutable"
