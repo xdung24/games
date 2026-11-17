@@ -42,7 +42,7 @@ func NewScreen(w fyne.Window, preferences fyne.Preferences, onBack func()) *Scre
 		onBack()
 	}
 	board.Hide()
-	startLoop(game, board)
+	startLoop(board)
 	return s
 }
 
@@ -51,10 +51,6 @@ func (s *Screen) Show() {
 	s.board.Show()
 	s.window.SetContent(s.content)
 	s.window.Canvas().Focus(s.board)
-	if s.board.renderer != nil {
-		s.board.renderer.bgAnim.Stop()
-		s.board.renderer.bgAnim.Start()
-	}
 }
 
 // Pause freezes play when the application leaves the foreground.
@@ -70,12 +66,19 @@ func (s *Screen) Pause() {
 func (s *Screen) Hide() {
 	s.Pause()
 	s.board.Hide()
-	if s.board.renderer != nil {
-		s.board.renderer.bgAnim.Stop()
-	}
 }
 
-func startLoop(game *Game, board *Board) {
+func (b *Board) tick(dt float32) {
+	if !b.Visible() || !b.game.Tick(dt) {
+		return
+	}
+	if b.game.state == StatePlaying || b.game.state == StateAttract {
+		b.backgroundTime += dt
+	}
+	b.Refresh()
+}
+
+func startLoop(board *Board) {
 	go func() {
 		ticker := time.NewTicker(time.Second / 60)
 		defer ticker.Stop()
@@ -84,9 +87,7 @@ func startLoop(game *Game, board *Board) {
 			dt := min(float32(now.Sub(last).Seconds()), 0.05)
 			last = now
 			fyne.Do(func() {
-				if board.Visible() && game.Tick(dt) {
-					board.Refresh()
-				}
+				board.tick(dt)
 			})
 		}
 	}()

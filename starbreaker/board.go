@@ -46,8 +46,9 @@ var saucerShape = []vec{
 // renders the game and feeds player input into the model.
 type Board struct {
 	widget.BaseWidget
-	game     *Game
-	renderer *boardRenderer
+	game           *Game
+	renderer       *boardRenderer
+	backgroundTime float32
 
 	toggleMute func() bool
 	muted      func() bool
@@ -64,7 +65,7 @@ func NewBoard(g *Game) *Board {
 func (b *Board) CreateRenderer() fyne.WidgetRenderer {
 	r := &boardRenderer{board: b, game: b.game}
 
-	r.bg, r.bgAnim = newNeonBackground()
+	r.bg = newNeonBackground()
 	r.entities = canvasContainer()
 
 	r.overlay = canvas.NewRectangle(colOverlay)
@@ -87,8 +88,12 @@ func (b *Board) CreateRenderer() fyne.WidgetRenderer {
 	})
 	r.back.Importance = widget.LowImportance
 
+	r.objects = []fyne.CanvasObject{r.bg, r.entities, r.score, r.wave, r.muteIcon, r.overlay, r.title}
+	for _, t := range r.subtitle {
+		r.objects = append(r.objects, t)
+	}
+	r.objects = append(r.objects, r.back)
 	b.renderer = r
-	r.bgAnim.Start()
 	return r
 }
 
@@ -96,9 +101,6 @@ func (b *Board) CreateRenderer() fyne.WidgetRenderer {
 // active frame.
 func (b *Board) Refresh() {
 	b.BaseWidget.Refresh()
-	if b.renderer != nil {
-		b.renderer.sync()
-	}
 }
 
 // --- input: pointer ---------------------------------------------------------
@@ -177,15 +179,37 @@ func (b *Board) KeyUp(e *fyne.KeyEvent) {
 	}
 }
 
-// boardRenderer maps game state onto canvas objects every frame. The background
-// shader, HUD and banner are persistent; the entity layer is rebuilt each frame.
+type neonPolygon struct {
+	object *canvas.ArbitraryPolygon
+	stroke color.NRGBA
+}
+
+type neonLine struct {
+	object *canvas.Line
+	stroke color.NRGBA
+}
+
+type boardDisplay struct {
+	size        fyne.Size
+	state       GameState
+	score, wave int
+	muted       bool
+}
+
+// boardRenderer reuses vector objects and vertex buffers across frames.
 type boardRenderer struct {
 	board *Board
 	game  *Game
 
-	bg       *canvas.Shader
-	bgAnim   *fyne.Animation
-	entities *fyne.Container // absolutely-positioned vector objects, refilled per frame
+	bg                      *canvas.Shader
+	entities                *fyne.Container
+	objects                 []fyne.CanvasObject
+	polygons                []*neonPolygon
+	lines                   []*neonLine
+	world                   []vec
+	polygonCount, lineCount int
+	lastHUD, lastBanner     boardDisplay
+	hudReady, bannerReady   bool
 
 	overlay  *canvas.Rectangle
 	score    *canvas.Text
@@ -206,25 +230,18 @@ func (r *boardRenderer) Layout(size fyne.Size) {
 
 func (r *boardRenderer) MinSize() fyne.Size { return fyne.NewSize(360, 360) }
 
-func (r *boardRenderer) Destroy() {
-	if r.bgAnim != nil {
-		r.bgAnim.Stop()
-	}
-}
+func (r *boardRenderer) Destroy() {}
 
 func (r *boardRenderer) Objects() []fyne.CanvasObject {
-	objs := []fyne.CanvasObject{r.bg, r.entities, r.score, r.wave, r.muteIcon, r.overlay, r.title}
-	for _, t := range r.subtitle {
-		objs = append(objs, t)
-	}
-	return append(objs, r.back)
+	return r.objects
 }
 
 func (r *boardRenderer) Refresh() { r.sync() }
 
-// sync rebuilds the entity layer and restyles the HUD/banner from the model.
+// sync updates the retained scene, preserving painter order as entities change.
 func (r *boardRenderer) sync() {
-	objs := make([]fyne.CanvasObject, 0, 64)
+	r.polygonCount, r.lineCount = 0, 0
+	objs := r.entities.Objects[:0]
 	objs = r.appendAsteroids(objs)
 	objs = r.appendBullets(objs)
 	objs = r.appendParticles(objs)
@@ -232,11 +249,11 @@ func (r *boardRenderer) sync() {
 	objs = r.appendShip(objs)
 	objs = r.appendLives(objs)
 	r.entities.Objects = objs
-	r.entities.Refresh()
+	canvas.Refresh(r.entities)
 
 	r.refreshHUD()
 	r.refreshBanner()
-	canvas.Refresh(r.bg)
+	r.bg.Uniforms["time"] = r.board.backgroundTime
 }
 
 // strokeWidth scales the neon line weight to the field size.
@@ -256,12 +273,12 @@ func (r *boardRenderer) appendShip(objs []fyne.CanvasObject) []fyne.CanvasObject
 		return objs
 	}
 	rad := g.shipRadius()
-	hull := transform(shipShape, g.ship.pos, rad, g.ship.angle)
 	sw := r.strokeWidth()
-	for _, off := range g.wrapOffsets(g.ship.pos, rad) {
-		pts := shift(hull, off)
-		objs = append(objs, strokePoly(pts, colShipGlow, sw*3)) // halo
-		objs = append(objs, strokePoly(pts, colShip, sw))       // bright hull
+	offsets, count := g.wrapOffsets(g.ship.pos, rad)
+	for _, off := range offsets[:count] {
+		hull := r.transform(shipShape, g.ship.pos, rad, g.ship.angle)
+		objs = append(objs, r.strokePoly(hull, off, colShipGlow, sw*3)) // halo
+		objs = append(objs, r.strokePoly(hull, off, colShip, sw))       // bright hull
 		if g.ship.thrust {
 			objs = append(objs, r.flame(off))
 		}
@@ -275,8 +292,8 @@ func (r *boardRenderer) flame(off vec) fyne.CanvasObject {
 	rad := g.shipRadius()
 	flick := 0.6 + 0.4*float32(math.Sin(float64(g.ship.pos.x+g.ship.pos.y)))
 	shape := []vec{{-0.4, 0.5}, {0, 1.0 + flick*0.6}, {0.4, 0.5}}
-	pts := shift(transform(shape, g.ship.pos, rad, g.ship.angle), off)
-	return strokePoly(pts, colFlame, r.strokeWidth())
+	pts := r.transform(shape, g.ship.pos, rad, g.ship.angle)
+	return r.strokePoly(pts, off, colFlame, r.strokeWidth())
 }
 
 // appendAsteroids draws every rock outline, wrapped at the edges.
@@ -284,9 +301,10 @@ func (r *boardRenderer) appendAsteroids(objs []fyne.CanvasObject) []fyne.CanvasO
 	g := r.game
 	sw := r.strokeWidth()
 	for _, a := range g.asteroids {
-		base := transform(a.shape, a.pos, a.radius, a.angle)
-		for _, off := range g.wrapOffsets(a.pos, a.radius) {
-			objs = append(objs, strokePoly(shift(base, off), colRock, sw))
+		base := r.transform(a.shape, a.pos, a.radius, a.angle)
+		offsets, count := g.wrapOffsets(a.pos, a.radius)
+		for _, off := range offsets[:count] {
+			objs = append(objs, r.strokePoly(base, off, colRock, sw))
 		}
 	}
 	return objs
@@ -299,9 +317,10 @@ func (r *boardRenderer) appendSaucer(objs []fyne.CanvasObject) []fyne.CanvasObje
 		return objs
 	}
 	rad := g.saucerRadius(g.saucer.big)
-	base := transform(saucerShape, g.saucer.pos, rad, 0)
-	for _, off := range g.wrapOffsets(g.saucer.pos, rad) {
-		objs = append(objs, strokePoly(shift(base, off), colSaucer, r.strokeWidth()))
+	base := r.transform(saucerShape, g.saucer.pos, rad, 0)
+	offsets, count := g.wrapOffsets(g.saucer.pos, rad)
+	for _, off := range offsets[:count] {
+		objs = append(objs, r.strokePoly(base, off, colSaucer, r.strokeWidth()))
 	}
 	return objs
 }
@@ -321,7 +340,7 @@ func (r *boardRenderer) appendBullets(objs []fyne.CanvasObject) []fyne.CanvasObj
 			col = colEnemyShot
 		}
 		end := b.pos.sub(dir.scale(tail))
-		objs = append(objs, line(b.pos, end, col, sw*1.1))
+		objs = append(objs, r.line(b.pos, end, col, sw*1.1))
 	}
 	return objs
 }
@@ -339,7 +358,7 @@ func (r *boardRenderer) appendParticles(objs []fyne.CanvasObject) []fyne.CanvasO
 		a := uint8(clampF(p.life/p.maxLife, 0, 1) * 255)
 		c := colSpark
 		c.A = a
-		objs = append(objs, line(p.pos, p.pos.sub(dir.scale(seg)), c, sw*0.8))
+		objs = append(objs, r.line(p.pos, p.pos.sub(dir.scale(seg)), c, sw*0.8))
 	}
 	return objs
 }
@@ -354,7 +373,7 @@ func (r *boardRenderer) appendLives(objs []fyne.CanvasObject) []fyne.CanvasObjec
 	y := g.h * 0.045
 	for i := 0; i < g.lives; i++ {
 		c := vec{g.w - rad*1.6 - float32(i)*rad*2.6, y}
-		objs = append(objs, strokePoly(transform(shipShape, c, rad, 0), colShip, r.strokeWidth()))
+		objs = append(objs, r.strokePoly(r.transform(shipShape, c, rad, 0), vec{}, colShip, r.strokeWidth()))
 	}
 	return objs
 }
@@ -362,6 +381,12 @@ func (r *boardRenderer) appendLives(objs []fyne.CanvasObject) []fyne.CanvasObjec
 // refreshHUD positions and fills the score and wave readouts.
 func (r *boardRenderer) refreshHUD() {
 	g := r.game
+	next := boardDisplay{size: fyne.NewSize(g.w, g.h), state: g.state, score: g.score, wave: g.wave}
+	next.muted = r.board.muted != nil && r.board.muted()
+	if r.hudReady && next == r.lastHUD {
+		return
+	}
+	r.lastHUD, r.hudReady = next, true
 	hud := min(g.h*0.032, g.w*0.035)
 	if g.state == StateAttract {
 		r.score.Text, r.wave.Text = "", ""
@@ -380,20 +405,31 @@ func (r *boardRenderer) refreshHUD() {
 	r.wave.Move(fyne.NewPos(0, g.h*0.035))
 
 	// A bottom-right glyph appears only while sound is muted (toggled with M).
-	if r.board.muted != nil && r.board.muted() {
+	if next.muted {
 		icon := g.h * 0.045
 		r.muteIcon.Resize(fyne.NewSize(icon, icon))
 		r.muteIcon.Move(fyne.NewPos(g.w-icon*1.4, g.h-icon*1.4))
-		r.muteIcon.Show()
-	} else {
+		if !r.muteIcon.Visible() {
+			r.muteIcon.Show()
+		}
+	} else if r.muteIcon.Visible() {
 		r.muteIcon.Hide()
 	}
-	r.muteIcon.Refresh()
+	r.score.Refresh()
+	r.wave.Refresh()
 }
 
 // refreshBanner shows the centre-screen prompt for the current state.
 func (r *boardRenderer) refreshBanner() {
 	g := r.game
+	next := boardDisplay{size: fyne.NewSize(g.w, g.h), state: g.state}
+	if g.state == StateGameOver {
+		next.score, next.wave = g.score, g.wave
+	}
+	if r.bannerReady && next == r.lastBanner {
+		return
+	}
+	r.lastBanner, r.bannerReady = next, true
 	r.overlay.Hide()
 	var title, sub string
 	switch g.state {
@@ -420,6 +456,7 @@ func (r *boardRenderer) refreshBanner() {
 	r.title.TextSize = g.h * 0.075
 	r.title.Resize(fyne.NewSize(g.w, r.title.TextSize*1.4))
 	r.title.Move(fyne.NewPos(0, g.h*0.34))
+	r.title.Refresh()
 
 	// canvas.Text is single-line, so render each "\n"-separated line separately.
 	subLines := strings.Split(sub, "\n")
@@ -439,6 +476,7 @@ func (r *boardRenderer) refreshBanner() {
 		} else {
 			t.Show()
 		}
+		t.Refresh()
 	}
 }
 
@@ -447,53 +485,55 @@ func (r *boardRenderer) refreshBanner() {
 // wrapOffsets returns the set of position offsets at which an object centred at
 // pos with the given radius should be drawn so it appears seamlessly across the
 // toroidal edges (one entry when well inside, up to four near a corner).
-func (g *Game) wrapOffsets(pos vec, radius float32) []vec {
-	xs := []float32{0}
-	ys := []float32{0}
+func (g *Game) wrapOffsets(pos vec, radius float32) (offsets [4]vec, count int) {
+	xs, ys := [2]float32{}, [2]float32{}
+	nx, ny := 1, 1
 	if pos.x < radius {
-		xs = append(xs, g.w)
+		xs[1], nx = g.w, 2
 	} else if pos.x > g.w-radius {
-		xs = append(xs, -g.w)
+		xs[1], nx = -g.w, 2
 	}
 	if pos.y < radius {
-		ys = append(ys, g.h)
+		ys[1], ny = g.h, 2
 	} else if pos.y > g.h-radius {
-		ys = append(ys, -g.h)
+		ys[1], ny = -g.h, 2
 	}
-	offs := make([]vec, 0, len(xs)*len(ys))
-	for _, x := range xs {
-		for _, y := range ys {
-			offs = append(offs, vec{x, y})
+	for _, x := range xs[:nx] {
+		for _, y := range ys[:ny] {
+			offsets[count] = vec{x, y}
+			count++
 		}
 	}
-	return offs
+	return
 }
 
 // transform maps a unit shape to world space: scaled by radius, rotated by
 // angle, translated to centre.
-func transform(shape []vec, centre vec, radius, angle float32) []vec {
-	out := make([]vec, len(shape))
+func (r *boardRenderer) transform(shape []vec, centre vec, radius, angle float32) []vec {
+	if cap(r.world) < len(shape) {
+		r.world = make([]vec, len(shape))
+	}
+	out := r.world[:len(shape)]
+	sin, cos := math.Sincos(float64(angle))
+	s, c := float32(sin), float32(cos)
 	for i, v := range shape {
-		out[i] = centre.add(v.scale(radius).rot(angle))
+		x, y := v.x*radius, v.y*radius
+		out[i] = centre.add(vec{x*c - y*s, x*s + y*c})
 	}
 	return out
 }
 
-// shift translates every point by off.
-func shift(pts []vec, off vec) []vec {
-	if off == (vec{}) {
-		return pts
+// strokePoly reuses a polygon and fits its local vertices to a padded world box.
+func (r *boardRenderer) strokePoly(world []vec, off vec, col color.NRGBA, width float32) *canvas.ArbitraryPolygon {
+	if r.polygonCount == len(r.polygons) {
+		p := &neonPolygon{object: canvas.NewArbitraryPolygon(nil, color.Transparent)}
+		p.object.StrokeColor = &p.stroke
+		r.polygons = append(r.polygons, p)
 	}
-	out := make([]vec, len(pts))
-	for i, p := range pts {
-		out[i] = p.add(off)
-	}
-	return out
-}
-
-// strokePoly builds a stroked, unfilled ArbitraryPolygon from world points by
-// fitting it to a tight bounding box (points are object-relative).
-func strokePoly(world []vec, col color.Color, width float32) *canvas.ArbitraryPolygon {
+	p := r.polygons[r.polygonCount]
+	r.polygonCount++
+	p.stroke = col
+	poly := p.object
 	minX, minY := world[0].x, world[0].y
 	maxX, maxY := minX, minY
 	for _, p := range world[1:] {
@@ -503,21 +543,30 @@ func strokePoly(world []vec, col color.Color, width float32) *canvas.ArbitraryPo
 	// Pad the box by the stroke so the outline isn't clipped at the quad edge.
 	pad := width + 1
 	minX, minY = minX-pad, minY-pad
-	pts := make([]fyne.Position, len(world))
+	if cap(poly.Points) < len(world) {
+		poly.Points = make([]fyne.Position, len(world))
+	}
+	pts := poly.Points[:len(world)]
 	for i, p := range world {
 		pts[i] = fyne.NewPos(p.x-minX, p.y-minY)
 	}
-	poly := canvas.NewArbitraryPolygon(pts, color.Transparent)
-	poly.StrokeColor = col
+	poly.Points = pts
 	poly.StrokeWidth = width
-	poly.Move(fyne.NewPos(minX, minY))
+	poly.Move(fyne.NewPos(minX+off.x, minY+off.y))
 	poly.Resize(fyne.NewSize(maxX-minX+pad, maxY-minY+pad))
 	return poly
 }
 
-// line builds a neon line segment between two world points.
-func line(a, b vec, col color.Color, width float32) *canvas.Line {
-	l := canvas.NewLine(col)
+func (r *boardRenderer) line(a, b vec, col color.NRGBA, width float32) *canvas.Line {
+	if r.lineCount == len(r.lines) {
+		p := &neonLine{}
+		p.object = canvas.NewLine(&p.stroke)
+		r.lines = append(r.lines, p)
+	}
+	p := r.lines[r.lineCount]
+	r.lineCount++
+	p.stroke = col
+	l := p.object
 	l.StrokeWidth = width
 	l.Position1 = fyne.NewPos(a.x, a.y)
 	l.Position2 = fyne.NewPos(b.x, b.y)

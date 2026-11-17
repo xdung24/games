@@ -18,9 +18,12 @@ hunting saucer, and clear wave after escalating wave.
 | `M` | Mute / unmute (remembered between runs) |
 
 A tap or click also starts the game and fires.
-The custom browser build adds a multi-touch control bar on touch-capable
-devices. Hold Left/Right, Thrust, and Fire simultaneously to steer and shoot;
-Jump, Pause, Restart, and Mute have their own buttons below the playfield.
+The custom browser build adds SVG-icon multi-touch controls on touch-capable
+devices. Left, Right, and Thrust sit at the bottom-left; Jump, Thrust, and Fire
+sit at the bottom-right. Either hand can hold Thrust, including both at once;
+releasing one Thrust button does not cancel the other. Hold steering, thrust,
+and fire simultaneously to steer and shoot. Pause, Restart, and Mute form a
+separate top-right group below the HUD. Icons retain accessible names and tooltips.
 Select the small back arrow beside **SCORE** to return to the launcher.
 Your session is paused and preserved;
 opening Star Breaker again restores it. Run `go run .` from the repository root,
@@ -40,3 +43,23 @@ not from this directory.
 
 The whole world wraps: fly off any edge and you reappear on the opposite side, and
 so do your shots and the rocks.
+
+## Rendering and mobile performance
+
+The renderer reuses neon polygons, tracers, particle objects, and vertex buffers
+instead of rebuilding the scene each frame. HUD text changes only when needed.
+The native-resolution nebula and vector detail are unchanged; one game clock
+drives both gameplay and the background. Pausing, game over, or leaving the game
+stops animation, while the attract screen still has drifting rocks and stars.
+
+Run the renderer allocation benchmark with:
+
+```sh
+go test -tags "ci migrated_fynedo" ./starbreaker -run '^$' -bench BenchmarkBoardRefresh -benchmem
+```
+
+The benchmark covers 5 or 30 rocks plus 80 particles. It measures scene updates,
+not GPU painting or browser FPS; verify active gameplay in a foreground release
+browser at phone dimensions and high DPI as well.
+
+Run the browser touch-input regressions with `node --test web/mobile.test.cjs`.

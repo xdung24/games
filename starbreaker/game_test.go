@@ -249,12 +249,28 @@ func TestPauseToggle(t *testing.T) {
 
 func TestWrapOffsetsNearCorner(t *testing.T) {
 	g := &Game{w: 100, h: 100}
-	// Dead centre: only the identity offset.
-	if got := len(g.wrapOffsets(vec{50, 50}, 5)); got != 1 {
-		t.Fatalf("centre offsets = %d, want 1", got)
-	}
-	// Hard in a corner: identity + x + y + xy = 4 copies.
-	if got := len(g.wrapOffsets(vec{1, 1}, 5)); got != 4 {
-		t.Fatalf("corner offsets = %d, want 4", got)
+	for _, tc := range []struct {
+		pos  vec
+		want []vec
+	}{
+		{vec{50, 50}, []vec{{0, 0}}},
+		{vec{1, 50}, []vec{{0, 0}, {100, 0}}},
+		{vec{99, 50}, []vec{{0, 0}, {-100, 0}}},
+		{vec{50, 1}, []vec{{0, 0}, {0, 100}}},
+		{vec{50, 99}, []vec{{0, 0}, {0, -100}}},
+		{vec{1, 1}, []vec{{0, 0}, {0, 100}, {100, 0}, {100, 100}}},
+		{vec{99, 1}, []vec{{0, 0}, {0, 100}, {-100, 0}, {-100, 100}}},
+		{vec{1, 99}, []vec{{0, 0}, {0, -100}, {100, 0}, {100, -100}}},
+		{vec{99, 99}, []vec{{0, 0}, {0, -100}, {-100, 0}, {-100, -100}}},
+	} {
+		offsets, count := g.wrapOffsets(tc.pos, 5)
+		if count != len(tc.want) {
+			t.Fatalf("offsets at %v: got %d, want %d", tc.pos, count, len(tc.want))
+		}
+		for i, want := range tc.want {
+			if offsets[i] != want {
+				t.Fatalf("offset %d at %v: got %v, want %v", i, tc.pos, offsets[i], want)
+			}
+		}
 	}
 }

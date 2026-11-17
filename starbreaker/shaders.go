@@ -1,14 +1,11 @@
 package starbreaker
 
-import (
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-)
+import "fyne.io/fyne/v2/canvas"
 
 // The neon background is a single full-field canvas.Shader. It paints a drifting
 // magenta/cyan/violet nebula from layered value-noise, a hashed twinkling
 // starfield, and a soft vignette — the animated backdrop the vector ships and
-// rocks glow against. Its "time" uniform is advanced by canvas.NewShaderAnimation.
+// rocks glow against. The game loop advances "time" only while the scene moves.
 //
 // The fragment body is shared verbatim between the desktop (OpenGL core,
 // #version 110) and the mobile/web (OpenGL ES, #version 100) targets; only the
@@ -111,11 +108,9 @@ precision mediump int;
 #endif
 ` + neonFragBody
 
-// newNeonBackground builds the animated nebula shader. The caller is responsible
-// for sizing/positioning it and for starting the returned animation; the
-// animation advances the shader's "time" uniform each frame.
-func newNeonBackground() (*canvas.Shader, *fyne.Animation) {
+// newNeonBackground builds the nebula shader, driven by the game loop's clock.
+func newNeonBackground() *canvas.Shader {
 	s := canvas.NewShader("starbreaker-neon", []byte(neonFragCore), []byte(neonFragES))
 	s.Uniforms = map[string]float32{"time": 0}
-	return s, canvas.NewShaderAnimation(s)
+	return s
 }

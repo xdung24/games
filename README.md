@@ -2,12 +2,16 @@
 
 ![Games](https://img.shields.io/badge/Fyne-v2.7-blue)
 
+Choose a game to see a brief loading screen with its icon and an animated
+indicator before it opens. The indicator respects the system animation setting.
+Returning Home preserves your game progress and menu selection.
+
 ## Play in desktop
 
 To build a standalone binary:
 
 ```sh
-go build  -tags 'release no_emoji migrated_fynedo' -ldflags="-linkmode=internal -H=windowsgui -s -w" -o bin/games.exe .
+go build  -tags 'release no_emoji migrated_fynedo' -ldflags='-linkmode=internal -H=windowsgui -s -w' -o bin/games.exe .
 ```
 
 ## Play in a browser

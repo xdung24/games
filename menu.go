@@ -2,14 +2,36 @@ package main
 
 import (
 	"fmt"
+	"image/color"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
 const gamesPerPage = 10
+
+type paginationTheme struct {
+	fyne.Theme
+}
+
+func (t *paginationTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+	if variant == theme.VariantDark {
+		switch name {
+		case theme.ColorNameButton:
+			return color.NRGBA{R: 0x24, G: 0x43, B: 0x5C, A: 0xFF}
+		case theme.ColorNameDisabledButton:
+			return color.NRGBA{R: 0x16, G: 0x2B, B: 0x3E, A: 0xFF}
+		case theme.ColorNameDisabled:
+			return color.NRGBA{R: 0xA6, G: 0xBA, B: 0xCD, A: 0xFF}
+		}
+	}
+	return t.Theme.Color(name, variant)
+}
 
 type gameMenuButton struct {
 	widget.Button
@@ -46,6 +68,9 @@ type gameMenu struct {
 	scroll             *container.Scroll
 	canvas             fyne.Canvas
 	previousKeyHandler func(*fyne.KeyEvent)
+	window             fyne.Window
+	loading            *widget.Activity
+	launchTimer        *time.Timer
 }
 
 func newGameMenu(entries []gameEntry) *gameMenu {
@@ -62,7 +87,12 @@ func newGameMenu(entries []gameEntry) *gameMenu {
 	icon.FillMode = canvas.ImageFillContain
 	icon.SetMinSize(fyne.NewSize(96, 96))
 	subtitle := widget.NewLabelWithStyle("Choose a game to play", fyne.TextAlignCenter, fyne.TextStyle{})
-	pages := container.NewCenter(container.NewHBox(m.previous, m.status, m.next))
+	buttonTheme := &paginationTheme{Theme: theme.DefaultTheme()}
+	pages := container.NewCenter(container.NewHBox(
+		container.NewThemeOverride(m.previous, buttonTheme),
+		m.status,
+		container.NewThemeOverride(m.next, buttonTheme),
+	))
 	m.content = container.NewPadded(container.NewBorder(
 		container.NewVBox(container.NewCenter(icon), subtitle), pages, nil, nil, m.scroll,
 	))
@@ -83,9 +113,10 @@ func (m *gameMenu) refresh() {
 			m.scrollToSelected()
 		}
 		card.play = func() {
-			m.selected = i
-			m.Hide()
-			entry.play()
+			if m.window != nil {
+				m.selected = i
+				m.launch(entry)
+			}
 		}
 		m.list.Add(card)
 	}
@@ -108,6 +139,7 @@ func (m *gameMenu) refresh() {
 
 func (m *gameMenu) Show(w fyne.Window) {
 	m.Hide()
+	m.window = w
 	m.canvas = w.Canvas()
 	w.SetContent(m.content)
 	m.previousKeyHandler = m.canvas.OnTypedKey()
@@ -120,11 +152,53 @@ func (m *gameMenu) Show(w fyne.Window) {
 }
 
 func (m *gameMenu) Hide() {
+	if m.launchTimer != nil {
+		m.launchTimer.Stop()
+		m.launchTimer = nil
+	}
+	if m.loading != nil {
+		m.loading.Stop()
+		m.loading = nil
+	}
+	m.window = nil
 	if m.canvas != nil {
 		m.canvas.SetOnTypedKey(m.previousKeyHandler)
 		m.canvas = nil
 		m.previousKeyHandler = nil
 	}
+}
+
+func (m *gameMenu) launch(entry gameEntry) {
+	w := m.window
+	m.Hide()
+
+	activity := widget.NewActivity()
+	m.loading = activity
+	label := widget.NewLabelWithStyle("Loading "+entry.name+"...", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	label.Wrapping = fyne.TextWrapWord
+	content := container.NewVBox(layout.NewSpacer())
+	if entry.icon != nil {
+		icon := canvas.NewImageFromResource(entry.icon)
+		icon.FillMode = canvas.ImageFillContain
+		icon.SetMinSize(fyne.NewSize(96, 96))
+		content.Add(container.NewCenter(icon))
+	}
+	content.Add(container.NewCenter(container.NewGridWrap(fyne.NewSize(48, 48), activity)))
+	content.Add(label)
+	content.Add(layout.NewSpacer())
+	w.SetContent(container.NewPadded(content))
+	activity.Start()
+
+	// Let the loading screen paint before initializing the game on the UI thread.
+	m.launchTimer = time.AfterFunc(300*time.Millisecond, func() {
+		fyne.Do(func() {
+			if m.loading != activity {
+				return
+			}
+			m.Hide()
+			entry.play()
+		})
+	})
 }
 
 func (m *gameMenu) navigate(key fyne.KeyName) bool {

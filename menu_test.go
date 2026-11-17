@@ -2,210 +2,378 @@ package main
 
 import (
 	"fmt"
+	"image/color"
+	"math"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
 func TestGameMenuKeyboardNavigation(t *testing.T) {
-	a := test.NewApp()
-	defer a.Quit()
-	w := test.NewWindow(widget.NewLabel(""))
-	defer w.Close()
+	synctest.Test(t, func(t *testing.T) {
+		a := test.NewApp()
+		defer a.Quit()
+		w := test.NewWindow(widget.NewLabel(""))
+		defer w.Close()
 
-	launched, launches, fallbackKeys := -1, 0, 0
-	w.Canvas().SetOnTypedKey(func(*fyne.KeyEvent) { fallbackKeys++ })
-	entries := make([]gameEntry, 21)
-	for i := range entries {
-		entries[i] = gameEntry{
-			name: fmt.Sprintf("Game %d", i+1),
-			play: func() {
-				launched = i
-				launches++
-				w.SetContent(widget.NewLabel("Playing"))
-			},
+		launched, launches, fallbackKeys := -1, 0, 0
+		w.Canvas().SetOnTypedKey(func(*fyne.KeyEvent) { fallbackKeys++ })
+		entries := make([]gameEntry, 21)
+		for i := range entries {
+			entries[i] = gameEntry{
+				name: fmt.Sprintf("Game %d", i+1),
+				play: func() {
+					launched = i
+					launches++
+					w.SetContent(widget.NewLabel("Playing"))
+				},
+			}
 		}
-	}
-	menu := newGameMenu(entries)
-	menu.Show(w)
-	w.Resize(fyne.NewSize(640, 350))
-	press := func(key fyne.KeyName) {
-		event := &fyne.KeyEvent{Name: key}
-		if focused := w.Canvas().Focused(); focused != nil {
-			focused.TypedKey(event)
-		} else if handler := w.Canvas().OnTypedKey(); handler != nil {
-			handler(event)
+		menu := newGameMenu(entries)
+		menu.Show(w)
+		w.Resize(fyne.NewSize(640, 350))
+		press := func(key fyne.KeyName) {
+			event := &fyne.KeyEvent{Name: key}
+			if focused := w.Canvas().Focused(); focused != nil {
+				focused.TypedKey(event)
+			} else if handler := w.Canvas().OnTypedKey(); handler != nil {
+				handler(event)
+			}
 		}
-	}
-	check := func(index int) {
-		t.Helper()
-		card := menu.list.Objects[index%gamesPerPage].(*gameCard)
-		if w.Canvas().Focused() != card || !card.focused ||
-			card.AccessibilityLabel() != fmt.Sprintf("Game %d", index+1) {
-			t.Fatalf("keyboard selection must focus game %d", index+1)
+		check := func(index int) {
+			t.Helper()
+			card := menu.list.Objects[index%gamesPerPage].(*gameCard)
+			if w.Canvas().Focused() != card || !card.focused ||
+				card.AccessibilityLabel() != fmt.Sprintf("Game %d", index+1) {
+				t.Fatalf("keyboard selection must focus game %d", index+1)
+			}
+			if launches != 0 {
+				t.Fatal("arrow navigation must not launch a game")
+			}
 		}
-		if launches != 0 {
-			t.Fatal("arrow navigation must not launch a game")
+		check(0)
+		press(fyne.KeyUp)
+		press(fyne.KeyLeft)
+		check(0)
+		for i := 1; i < gamesPerPage; i++ {
+			press(fyne.KeyDown)
 		}
-	}
-	check(0)
-	press(fyne.KeyUp)
-	press(fyne.KeyLeft)
-	check(0)
-	for i := 1; i < gamesPerPage; i++ {
+		check(9)
+		card := menu.list.Objects[9]
+		if menu.scroll.Offset.Y <= 0 ||
+			card.Position().Y+card.Size().Height > menu.scroll.Offset.Y+menu.scroll.Size().Height+0.01 {
+			t.Fatal("keyboard selection must scroll the selected card into view")
+		}
 		press(fyne.KeyDown)
-	}
-	check(9)
-	card := menu.list.Objects[9]
-	if menu.scroll.Offset.Y <= 0 ||
-		card.Position().Y+card.Size().Height > menu.scroll.Offset.Y+menu.scroll.Size().Height+0.01 {
-		t.Fatal("keyboard selection must scroll the selected card into view")
-	}
-	press(fyne.KeyDown)
-	check(9)
-	press(fyne.KeyRight)
-	check(19)
-	press(fyne.KeyRight)
-	check(20)
-	press(fyne.KeyRight)
-	press(fyne.KeyDown)
-	check(20)
-	press(fyne.KeyLeft)
-	check(10)
-	press(fyne.KeyUp)
-	check(10)
-	w.Canvas().Focus(menu.next)
-	press(fyne.KeyDown)
-	check(11)
-	w.Canvas().Unfocus()
-	press(fyne.KeyDown)
-	check(12)
-	w.Canvas().Focus(menu.list.Objects[5].(*gameCard))
-	press(fyne.KeyUp)
-	check(14)
-	press(fyne.KeyReturn)
-	if launched != 14 || launches != 1 {
-		t.Fatal("Enter must launch the selected game exactly once")
-	}
-	w.Canvas().Unfocus()
-	press(fyne.KeyLeft)
-	if fallbackKeys != 1 || menu.page != 1 {
-		t.Fatal("menu navigation must stop handling keys while a game is open")
-	}
-	menu.Show(w)
-	if w.Canvas().Focused() != menu.list.Objects[4].(*gameCard) {
-		t.Fatal("returning Home must restore the selected game")
-	}
+		check(9)
+		press(fyne.KeyRight)
+		check(19)
+		press(fyne.KeyRight)
+		check(20)
+		press(fyne.KeyRight)
+		press(fyne.KeyDown)
+		check(20)
+		press(fyne.KeyLeft)
+		check(10)
+		press(fyne.KeyUp)
+		check(10)
+		w.Canvas().Focus(menu.next)
+		press(fyne.KeyDown)
+		check(11)
+		w.Canvas().Unfocus()
+		press(fyne.KeyDown)
+		check(12)
+		w.Canvas().Focus(menu.list.Objects[5].(*gameCard))
+		press(fyne.KeyUp)
+		check(14)
+		press(fyne.KeyReturn)
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if launched != 14 || launches != 1 {
+			t.Fatal("Enter must launch the selected game exactly once")
+		}
+		w.Canvas().Unfocus()
+		press(fyne.KeyLeft)
+		if fallbackKeys != 1 || menu.page != 1 {
+			t.Fatal("menu navigation must stop handling keys while a game is open")
+		}
+		menu.Show(w)
+		if w.Canvas().Focused() != menu.list.Objects[4].(*gameCard) {
+			t.Fatal("returning Home must restore the selected game")
+		}
+	})
 }
 
 func TestGameMenuKeyboardEmptyAndSingleGame(t *testing.T) {
-	a := test.NewApp()
-	defer a.Quit()
 	for _, count := range []int{0, 1} {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
-			launches := 0
-			entries := make([]gameEntry, count)
-			if count == 1 {
-				entries[0] = gameEntry{name: "Only game", play: func() { launches++ }}
-			}
-			menu := newGameMenu(entries)
-			w := test.NewWindow(widget.NewLabel(""))
-			defer w.Close()
-			menu.Show(w)
-			defer menu.Hide()
-			for _, key := range []fyne.KeyName{fyne.KeyUp, fyne.KeyDown, fyne.KeyLeft, fyne.KeyRight} {
-				event := &fyne.KeyEvent{Name: key}
-				if focused := w.Canvas().Focused(); focused != nil {
-					focused.TypedKey(event)
-				} else {
-					w.Canvas().OnTypedKey()(event)
+			synctest.Test(t, func(t *testing.T) {
+				a := test.NewApp()
+				defer a.Quit()
+				launches := 0
+				entries := make([]gameEntry, count)
+				if count == 1 {
+					entries[0] = gameEntry{name: "Only game", play: func() { launches++ }}
 				}
-			}
-			if menu.page != 0 || menu.selected != 0 || launches != 0 {
-				t.Fatal("arrow keys must not navigate past available games or pages")
-			}
-			if count == 1 {
-				w.Canvas().Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
-				if launches != 1 {
-					t.Fatal("Enter must launch the only game")
+				menu := newGameMenu(entries)
+				w := test.NewWindow(widget.NewLabel(""))
+				defer w.Close()
+				menu.Show(w)
+				defer menu.Hide()
+				for _, key := range []fyne.KeyName{fyne.KeyUp, fyne.KeyDown, fyne.KeyLeft, fyne.KeyRight} {
+					event := &fyne.KeyEvent{Name: key}
+					if focused := w.Canvas().Focused(); focused != nil {
+						focused.TypedKey(event)
+					} else {
+						w.Canvas().OnTypedKey()(event)
+					}
 				}
-			}
+				if menu.page != 0 || menu.selected != 0 || launches != 0 {
+					t.Fatal("arrow keys must not navigate past available games or pages")
+				}
+				if count == 1 {
+					w.Canvas().Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+					time.Sleep(time.Second)
+					synctest.Wait()
+					if launches != 1 {
+						t.Fatal("Enter must launch the only game")
+					}
+				}
+			})
 		})
 	}
 }
 
 func TestGameMenuPagination(t *testing.T) {
-	a := test.NewApp()
-	defer a.Quit()
+	synctest.Test(t, func(t *testing.T) {
+		a := test.NewApp()
+		defer a.Quit()
 
-	selected := -1
-	entries := make([]gameEntry, 21)
-	for i := range entries {
-		entries[i] = gameEntry{
-			name: fmt.Sprintf("Game %d", i+1),
-			play: func() { selected = i },
+		selected := -1
+		entries := make([]gameEntry, 21)
+		for i := range entries {
+			entries[i] = gameEntry{
+				name: fmt.Sprintf("Game %d", i+1),
+				play: func() { selected = i },
+			}
 		}
-	}
-	menu := newGameMenu(entries)
-	check := func(count int, first, last, status string, previousDisabled, nextDisabled bool) {
-		t.Helper()
-		if len(menu.list.Objects) != count {
-			t.Fatalf("got %d games, want %d", len(menu.list.Objects), count)
+		menu := newGameMenu(entries)
+		w := test.NewWindow(widget.NewLabel(""))
+		defer w.Close()
+		menu.Show(w)
+		check := func(count int, first, last, status string, previousDisabled, nextDisabled bool) {
+			t.Helper()
+			if len(menu.list.Objects) != count {
+				t.Fatalf("got %d games, want %d", len(menu.list.Objects), count)
+			}
+			if got := menu.list.Objects[0].(*gameCard).AccessibilityLabel(); got != first {
+				t.Errorf("first game = %q, want %q", got, first)
+			}
+			if got := menu.list.Objects[count-1].(*gameCard).AccessibilityLabel(); got != last {
+				t.Errorf("last game = %q, want %q", got, last)
+			}
+			if menu.status.Text != status {
+				t.Errorf("page status = %q, want %q", menu.status.Text, status)
+			}
+			if menu.previous.Disabled() != previousDisabled || menu.next.Disabled() != nextDisabled {
+				t.Error("pagination buttons have incorrect enabled state")
+			}
 		}
-		if got := menu.list.Objects[0].(*gameCard).AccessibilityLabel(); got != first {
-			t.Errorf("first game = %q, want %q", got, first)
-		}
-		if got := menu.list.Objects[count-1].(*gameCard).AccessibilityLabel(); got != last {
-			t.Errorf("last game = %q, want %q", got, last)
-		}
-		if menu.status.Text != status {
-			t.Errorf("page status = %q, want %q", menu.status.Text, status)
-		}
-		if menu.previous.Disabled() != previousDisabled || menu.next.Disabled() != nextDisabled {
-			t.Error("pagination buttons have incorrect enabled state")
-		}
-	}
 
-	check(10, "Game 1", "Game 10", "Page 1 of 3", true, false)
-	test.Tap(menu.previous)
-	check(10, "Game 1", "Game 10", "Page 1 of 3", true, false)
-	test.Tap(menu.next)
-	check(10, "Game 11", "Game 20", "Page 2 of 3", false, false)
-	test.Tap(menu.list.Objects[0].(*gameCard))
-	if selected != 10 {
-		t.Errorf("selected game = %d, want 10", selected)
-	}
-	test.Tap(menu.next)
-	check(1, "Game 21", "Game 21", "Page 3 of 3", false, true)
-	test.Tap(menu.next)
-	check(1, "Game 21", "Game 21", "Page 3 of 3", false, true)
-	test.Tap(menu.previous)
-	check(10, "Game 11", "Game 20", "Page 2 of 3", false, false)
+		check(10, "Game 1", "Game 10", "Page 1 of 3", true, false)
+		test.Tap(menu.previous)
+		check(10, "Game 1", "Game 10", "Page 1 of 3", true, false)
+		test.Tap(menu.next)
+		check(10, "Game 11", "Game 20", "Page 2 of 3", false, false)
+		test.Tap(menu.list.Objects[0].(*gameCard))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if selected != 10 {
+			t.Errorf("selected game = %d, want 10", selected)
+		}
+		menu.Show(w)
+		test.Tap(menu.next)
+		check(1, "Game 21", "Game 21", "Page 3 of 3", false, true)
+		test.Tap(menu.next)
+		check(1, "Game 21", "Game 21", "Page 3 of 3", false, true)
+		test.Tap(menu.previous)
+		check(10, "Game 11", "Game 20", "Page 2 of 3", false, false)
+	})
 }
 
 func TestGameMenuSingleGame(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		a := test.NewApp()
+		defer a.Quit()
+
+		played := false
+		menu := newGameMenu([]gameEntry{{name: "game", play: func() { played = true }}})
+		w := test.NewWindow(widget.NewLabel(""))
+		defer w.Close()
+		menu.Show(w)
+		if len(menu.list.Objects) != 1 || menu.status.Text != "Page 1 of 1" ||
+			!menu.previous.Disabled() || !menu.next.Disabled() {
+			t.Fatal("single-game menu must show one game and disable pagination")
+		}
+		card := menu.list.Objects[0].(*gameCard)
+		text := card.Content.(*fyne.Container)
+		if _, ok := text.Objects[1].(*widget.Label); !ok {
+			t.Fatal("game card must display its description without a Play button")
+		}
+		test.Tap(card)
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if !played {
+			t.Error("tapping the card did not launch the game")
+		}
+	})
+}
+
+func TestGameMenuPaginationDarkContrast(t *testing.T) {
 	a := test.NewApp()
 	defer a.Quit()
+	a.Settings().SetTheme(theme.DarkTheme())
+	menu := newGameMenu(nil)
+	w := test.NewWindow(menu.content)
+	defer w.Close()
 
-	played := false
-	menu := newGameMenu([]gameEntry{{name: "game", play: func() { played = true }}})
-	if len(menu.list.Objects) != 1 || menu.status.Text != "Page 1 of 1" ||
-		!menu.previous.Disabled() || !menu.next.Disabled() {
-		t.Fatal("single-game menu must show one game and disable pagination")
+	luminance := func(c color.Color) float64 {
+		r, g, b, _ := c.RGBA()
+		linear := func(channel uint32) float64 {
+			value := float64(channel) / 65535
+			if value <= 0.04045 {
+				return value / 12.92
+			}
+			return math.Pow((value+0.055)/1.055, 2.4)
+		}
+		return 0.2126*linear(r) + 0.7152*linear(g) + 0.0722*linear(b)
 	}
-	card := menu.list.Objects[0].(*gameCard)
-	text := card.Content.(*fyne.Container)
-	if _, ok := text.Objects[1].(*widget.Label); !ok {
-		t.Fatal("game card must display its description without a Play button")
+	var findText func(fyne.CanvasObject, string) *canvas.Text
+	findText = func(object fyne.CanvasObject, text string) *canvas.Text {
+		if label, ok := object.(*canvas.Text); ok && label.Text == text {
+			return label
+		}
+		var children []fyne.CanvasObject
+		switch object := object.(type) {
+		case *fyne.Container:
+			children = object.Objects
+		case fyne.Widget:
+			children = test.WidgetRenderer(object).Objects()
+		}
+		for _, child := range children {
+			if label := findText(child, text); label != nil {
+				return label
+			}
+		}
+		return nil
 	}
-	test.Tap(card)
-	if !played {
-		t.Error("tapping the card did not launch the game")
+	for _, button := range []*gameMenuButton{menu.previous, menu.next} {
+		for _, state := range []string{"normal", "hover", "focus", "disabled"} {
+			t.Run(button.Text+"/"+state, func(t *testing.T) {
+				button.Enable()
+				button.MouseOut()
+				button.FocusLost()
+				switch state {
+				case "hover":
+					button.MouseIn(&desktop.MouseEvent{})
+				case "focus":
+					button.FocusGained()
+				case "disabled":
+					button.Disable()
+				}
+				renderer := test.WidgetRenderer(button)
+				label := findText(button, button.Text)
+				if label == nil {
+					t.Fatal("pagination button must render its label")
+				}
+				background := renderer.Objects()[0].(*canvas.Rectangle)
+				fg, bg := luminance(label.Color), luminance(background.FillColor)
+				contrast := (max(fg, bg) + 0.05) / (min(fg, bg) + 0.05)
+				if contrast < 4.5 {
+					t.Errorf("text/background contrast = %.2f:1, want at least 4.5:1", contrast)
+				}
+			})
+		}
 	}
+}
+
+func TestGameMenuLoadingTransition(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		a := test.NewApp()
+		defer a.Quit()
+		w := test.NewWindow(widget.NewLabel(""))
+		defer w.Close()
+		w.Resize(fyne.NewSize(640, 350))
+
+		launches := 0
+		menu := newGameMenu([]gameEntry{{
+			name: "Game", icon: homeIcon,
+			play: func() {
+				launches++
+				w.SetContent(widget.NewLabel("Playing"))
+			},
+		}})
+		menu.Show(w)
+		card := menu.list.Objects[0].(*gameCard)
+		test.Tap(card)
+		if launches != 0 || menu.loading == nil || w.Content() == menu.content {
+			t.Fatal("selecting a game must display loading before launching")
+		}
+		if w.Canvas().Focused() == card {
+			t.Fatal("the game card must lose focus while loading")
+		}
+		content := w.Content().(*fyne.Container).Objects[0].(*fyne.Container)
+		label := content.Objects[len(content.Objects)-2].(*widget.Label)
+		if label.Text != "Loading Game..." {
+			t.Fatalf("loading screen text = %q", label.Text)
+		}
+		if label.Size().Width < fyne.MeasureText(label.Text, theme.TextSize(), label.TextStyle).Width {
+			t.Fatal("loading text must have enough width to avoid unnecessary wrapping")
+		}
+		test.Tap(card)
+		card.TypedKey(&fyne.KeyEvent{Name: fyne.KeyReturn})
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if launches != 1 || menu.loading != nil || menu.launchTimer != nil {
+			t.Fatal("loading must launch exactly once and stop its animation and timer")
+		}
+		menu.Show(w)
+		if w.Content() != menu.content || w.Canvas().Focused() != card {
+			t.Fatal("returning Home must restore the menu and selected card")
+		}
+	})
+}
+
+func TestGameMenuLoadingCancelledOnHome(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		a := test.NewApp()
+		defer a.Quit()
+		w := test.NewWindow(widget.NewLabel(""))
+		defer w.Close()
+		launches := 0
+		menu := newGameMenu([]gameEntry{{name: "Game", play: func() { launches++ }}})
+		menu.Show(w)
+		test.Tap(menu.list.Objects[0].(*gameCard))
+		menu.Show(w)
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if launches != 0 || menu.loading != nil || menu.launchTimer != nil || w.Content() != menu.content {
+			t.Fatal("returning Home while loading must cancel the pending launch")
+		}
+		test.Tap(menu.list.Objects[0].(*gameCard))
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if launches != 1 {
+			t.Fatal("cancelling loading must not prevent a later launch")
+		}
+	})
 }
 
 func TestGameCardWholeAreaAndKeyboard(t *testing.T) {
