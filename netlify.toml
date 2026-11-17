@@ -1,6 +1,6 @@
 [build]
-  command = "go run fyne.io/tools/cmd/fyne@latest package -os web --release"
-  publish = "wasm"
+  command = "GOOS=js GOARCH=wasm go build -tags release -ldflags="-s -w" -o web/games.wasm ."
+  publish = "web"
 
 [build.environment]
   GO_VERSION = "1.26"
