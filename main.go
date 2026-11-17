@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/app"
 
 	brickbreaker "github.com/xdung24/game/brickbreaker"
+	"github.com/xdung24/game/flappybird"
 	starbreaker "github.com/xdung24/game/starbreaker"
 )
 
@@ -29,7 +30,7 @@ type gameEntry struct {
 }
 
 func main() {
-	a := app.New()
+	a := app.NewWithID("com.dungle.game")
 	a.Settings().SetTheme(brickbreaker.NewTheme())
 	w := a.NewWindow("game-window")
 	w.SetPadded(false)
@@ -37,6 +38,7 @@ func main() {
 	var menu *gameMenu
 	var brickScreen *brickbreaker.Screen
 	var starScreen *starbreaker.Screen
+	var flappyScreen *flappybird.Screen
 	showMenu := func() {
 		a.Settings().SetTheme(brickbreaker.NewTheme())
 		w.SetTitle("Play game")
@@ -69,6 +71,19 @@ func main() {
 				}
 				starScreen.Show()
 			},
+		},
+		{
+			name:        "Flappy Bird",
+			description: "Tap to flap, slip through the pipes, and beat your best score.",
+			icon:        flappybird.Icon,
+			play: func() {
+				a.Settings().SetTheme(brickbreaker.NewTheme())
+				w.SetTitle("Flappy Bird")
+				if flappyScreen == nil {
+					flappyScreen = flappybird.NewScreen(w, a.Preferences(), showMenu)
+				}
+				flappyScreen.Show()
+			},
 		}})
 	w.Resize(fyne.NewSize(640, 600))
 	showMenu()
@@ -79,6 +94,9 @@ func main() {
 		}
 		if starScreen != nil {
 			starScreen.Pause()
+		}
+		if flappyScreen != nil {
+			flappyScreen.Pause()
 		}
 	})
 	w.ShowAndRun()

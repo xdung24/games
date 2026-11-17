@@ -10,14 +10,14 @@ go run .
 
 The app opens on a game-selection menu with up to 10 games per page. Use
 **Previous** and **Next** to change pages, then tap anywhere on a game card to
-open it. Brick Breaker and Star Breaker are available. Select the small
-back arrow beside **SCORE** in either game to
+open it. Brick Breaker, Star Breaker, and Flappy Bird are available. Select the
+back arrow (beside **SCORE** in the breaker games, bottom-left in Flappy Bird) to
 return to the menu; each game is paused and kept for when you return.
 You can also press **Esc** to pause, then press **Esc** again to return Home.
 Other input cancels this two-press sequence.
 This menu is available in both desktop and browser builds.
 The Home menu displays the root `Icon.png` above its subtitle, and each game
-card displays its game's `Icon.png` to the left of the title and description.
+card displays its game's icon to the left of the title and description.
 These icons are embedded in the app, so no separate image files are needed
 when running a built binary.
 Game cards smoothly highlight their background and border on mouse hover or
@@ -26,7 +26,7 @@ and **Enter** or **Space** to play. **Tab** also moves keyboard focus.
 The selected card stays visible and is restored when you return to the menu.
 
 The root `main` package owns the launcher and menu. The `brickbreaker` and
-`starbreaker` directories are importable game packages; each owns its rendering,
+`starbreaker` and `flappybird` directories are importable game packages; each owns its rendering,
 audio, and simulation loop. They share one audio device through `internal/audio`.
 The launcher uses `NewScreen`, `Show`, and `Pause` to manage each game without
 accessing its internal state. Run build and package commands from the repository root.
@@ -96,3 +96,20 @@ remain silent if the audio device is not ready during startup.
 Use the mouse or arrow keys to move and click or press `Space` to launch,
 pause/resume, or play again. The current Fyne web driver does not deliver the
 letter-key shortcuts (`A`/`D`, `P`, `R`, `M`) used by the desktop build.
+
+## Flappy Bird
+
+Tap/click the playfield or press **Space/Up** to start and flap. Pass completely
+through each pipe pair to score one point; hitting a pipe, the ceiling, or the
+ground ends the round. Tap or press **Space/Up** after game over to try again.
+The best score is saved in app preferences.
+
+Use the bottom buttons for Home, pause/resume, restart, and mute. **P**, **R**,
+and **M** also work on desktop. Tap or press **Space/Up** to resume a paused
+round; returning from Home keeps the round paused. The playfield keeps a fixed
+aspect ratio and difficulty at every window size.
+
+The [Felgo reference](https://github.com/FelgoSDK/FlappyBird) was consulted for
+gameplay mechanics. Its license excludes redistribution of the supplied artwork
+and audio, so this implementation uses only original vector artwork and
+synthesized sounds, with no copied reference assets or source code.
