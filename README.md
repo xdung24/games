@@ -8,7 +8,8 @@ Returning Home preserves your game progress and menu selection.
 
 The game menu uses each game's platform settings for the build target.
 Browser builds use the web setting even on mobile devices. Bombsweeper is
-currently available only in desktop builds.
+currently available only in desktop builds. CroakCross supports desktop, mobile,
+and browser builds.
 
 ## Play in desktop
 

@@ -10,6 +10,7 @@ import (
 	asteroidshooter "github.com/xdung24/games/asteroidshooter"
 	bombsweeper "github.com/xdung24/games/bombsweeper"
 	brickbreaker "github.com/xdung24/games/brickbreaker"
+	croakcross "github.com/xdung24/games/croakcross"
 	flappychick "github.com/xdung24/games/flappychick"
 	flappygophy "github.com/xdung24/games/flappygophy"
 )
@@ -38,6 +39,10 @@ var flappyChickIcon = fyne.NewStaticResource("flappy-chick-Icon.svg", flappyChic
 var bombsweeperIconPNG []byte
 var bombsweeperIcon = fyne.NewStaticResource("bombsweeper-Icon.png", bombsweeperIconPNG)
 
+//go:embed croakcross/Icon.png
+var croakcrossIconPNG []byte
+var croakcrossIcon = fyne.NewStaticResource("croakcross-Icon.png", croakcrossIconPNG)
+
 type gameEntry struct {
 	name        string
 	description string
@@ -51,6 +56,7 @@ type gameEntry struct {
 func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string) ([]gameEntry, func()) {
 	var brickScreen *brickbreaker.Screen
 	var asteroidshooterScreen *asteroidshooter.Screen
+	var croakcrossScreen *croakcross.Screen
 	var flappyScreen *flappychick.Screen
 	var gophyScreen *flappygophy.Screen
 
@@ -108,6 +114,22 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 			},
 		},
 		{
+			name:        "CroakCross",
+			description: "Hop across traffic and ride the river platforms to safety.",
+			icon:        croakcrossIcon,
+			isDesktop:   true,
+			isMobile:    true,
+			isWeb:       true,
+			play: func() {
+				a.Settings().SetTheme(croakcross.NewTheme())
+				w.SetTitle("CroakCross")
+				if croakcrossScreen == nil {
+					croakcrossScreen = croakcross.NewScreen(w, a.Preferences(), showMenu)
+				}
+				croakcrossScreen.Show()
+			},
+		},
+		{
 			name:        "Flappy Chick",
 			description: "Tap to flap, slip through the pipes, and beat your best score.",
 			icon:        flappyChickIcon,
@@ -147,6 +169,9 @@ func newGameEntries(a fyne.App, w fyne.Window, showMenu func(), targetOS string)
 		}
 		if brickScreen != nil {
 			brickScreen.Pause()
+		}
+		if croakcrossScreen != nil {
+			croakcrossScreen.Pause()
 		}
 		if flappyScreen != nil {
 			flappyScreen.Pause()
