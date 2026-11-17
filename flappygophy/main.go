@@ -3,7 +3,6 @@ package flappygophy
 import (
 	"image"
 	"image/color"
-	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -68,12 +67,9 @@ type Game struct {
 	deathTime time.Time
 	prefs     fyne.Preferences
 
-	raster     *canvas.Raster
-	background *image.RGBA
-	frameImage *image.RGBA
-	scoreText  *canvas.Text
-	msgText    *canvas.Text
-	subText    *canvas.Text
+	scoreText *canvas.Text
+	msgText   *canvas.Text
+	subText   *canvas.Text
 }
 
 func NewGame(prefs fyne.Preferences) *Game {
@@ -82,12 +78,6 @@ func NewGame(prefs fyne.Preferences) *Game {
 		prefs:   prefs,
 		hiScore: prefs.IntWithFallback("flappygophy.hiScore", 0),
 	}
-
-	g.raster = canvas.NewRaster(g.drawFrame)
-	if fyne.CurrentDevice().IsBrowser() {
-		g.raster.Generator = g.drawWebFrame
-	}
-	g.raster.SetMinSize(fyne.NewSize(gameW, gameH))
 
 	g.scoreText = canvas.NewText("0", color.White)
 	g.scoreText.TextSize = 44
@@ -170,12 +160,12 @@ func (g *Game) endRound() {
 	go playSplat()
 }
 
-// update advances physics and checks collisions; called every tick.
-func (g *Game) update() {
+// update advances physics and reports whether the scene changed.
+func (g *Game) update() bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.state != StatePlaying {
-		return
+		return false
 	}
 
 	g.frame++
@@ -194,7 +184,7 @@ func (g *Game) update() {
 	}
 
 	// Move pipes left; score when bird clears the right edge.
-	var keep []Pipe
+	keep := g.pipes[:0]
 	for _, p := range g.pipes {
 		p.x -= pipeSpeed
 		oldRight := p.x + pipeW + pipeSpeed
@@ -210,15 +200,16 @@ func (g *Game) update() {
 	// Ground / ceiling collision.
 	if g.birdY-birdRadius <= 0 || g.birdY+birdRadius >= gameH-groundH {
 		g.endRound()
-		return
+		return true
 	}
 	// Pipe collision.
 	for _, p := range g.pipes {
 		if pipeCollides(g.birdY, p) {
 			g.endRound()
-			return
+			return true
 		}
 	}
+	return true
 }
 
 func pipeCollides(birdY float64, p Pipe) bool {
@@ -231,80 +222,6 @@ func pipeCollides(birdY float64, p Pipe) bool {
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
-
-func (g *Game) drawWebFrame(w, h int) image.Image {
-	// Bound CPU painting and texture uploads independently of device pixel ratio.
-	if w > gameW || h > gameH {
-		scale := min(gameW/float64(w), gameH/float64(h))
-		w, h = max(1, int(float64(w)*scale)), max(1, int(float64(h)*scale))
-	}
-	return g.drawFrame(w, h)
-}
-
-func (g *Game) drawFrame(w, h int) image.Image {
-	g.mu.Lock()
-	state := g.state
-	by := g.birdY
-	bvy := g.birdVY
-	ft := g.flapTimer
-	pipes := make([]Pipe, len(g.pipes))
-	copy(pipes, g.pipes)
-	g.mu.Unlock()
-
-	sx, sy := float64(w)/gameW, float64(h)/gameH
-	gndY := int((gameH - groundH) * sy)
-
-	if g.frameImage == nil || g.frameImage.Bounds().Dx() != w || g.frameImage.Bounds().Dy() != h {
-		g.background = image.NewRGBA(image.Rect(0, 0, w, h))
-		g.frameImage = image.NewRGBA(g.background.Bounds())
-		drawSky(g.background, gndY, w)
-		drawGround(g.background, gndY, w, h)
-	}
-	img := g.frameImage
-	copy(img.Pix, g.background.Pix)
-
-	drawClouds(img, w, h, sx, sy)
-	for _, p := range pipes {
-		drawPipe(img, p, sx, sy, gndY, w, h)
-	}
-
-	if state == StateStart {
-		lx := w / 2
-		ly := int(float64(h) * 0.30)
-		lr := max(int(38*math.Min(sx, sy)), 12)
-		drawBird(img, lx, ly, lr, 0, 0, w, h)
-	} else {
-		bx := int(birdX * sx)
-		byPx := int(by * sy)
-		br := max(int(birdRadius*math.Min(sx, sy)), 8)
-		drawBird(img, bx, byPx, br, bvy, ft, w, h)
-	}
-
-	return img
-}
-
-func drawSky(img *image.RGBA, gndY, w int) {
-	// Sky gradient: light-blue top → clear blue → deeper horizon blue.
-	for y := 0; y < gndY; y++ {
-		t := float64(y) / float64(gndY)
-		var r, gg, b uint8
-		if t < 0.15 {
-			u := t / 0.15 // 0→1 over the top 15%
-			r, gg, b = clamp8(lerp(185, 135, u)), clamp8(lerp(225, 206, u)), clamp8(lerp(250, 235, u))
-		} else {
-			u := (t - 0.15) / 0.85 // 0→1 over the lower 85%
-			r, gg, b = clamp8(lerp(135, 80, u)), clamp8(lerp(206, 160, u)), clamp8(lerp(235, 210, u))
-		}
-		off := y * img.Stride
-		for x := 0; x < w; x++ {
-			img.Pix[off+x*4], img.Pix[off+x*4+1], img.Pix[off+x*4+2], img.Pix[off+x*4+3] = r, gg, b, 255
-		}
-	}
-
-}
-
-func lerp(a, b uint8, t float64) float64 { return float64(a)*(1-t) + float64(b)*t }
-func clamp8(v float64) uint8             { return uint8(v) }
 
 // groundHash returns a deterministic value in [-32, 31] for a given (x, y).
 func groundHash(x, y int) int {
@@ -344,187 +261,6 @@ func drawGround(img *image.RGBA, gndY, w, h int) {
 			img.Pix[off+x*4+1] = gv
 			img.Pix[off+x*4+2] = bv
 			img.Pix[off+x*4+3] = 255
-		}
-	}
-}
-
-func drawClouds(img *image.RGBA, w, h int, sx, sy float64) {
-	tSec := float64(time.Now().UnixMilli()) * 0.001
-	const cloudMargin = 150
-	const span = float64(gameW + 2*cloudMargin)
-	cloudYOffset := gameH * 0.08
-
-	for _, spec := range cloudDefs {
-		elapsed := float64(math.Mod(tSec*float64(spec.speed), span))
-		cx := float64(spec.baseX) - elapsed
-		if cx < -cloudMargin {
-			cx += span
-		}
-		for _, puff := range cloudPuffs {
-			pr := int(float64(spec.radius) * float64(puff[2]) * math.Min(sx, sy))
-			px := int((cx + float64(spec.radius)*float64(puff[0])) * sx)
-			py := int((float64(spec.baseY) + float64(spec.radius)*float64(puff[1]) + cloudYOffset) * sy)
-			drawCircleAlpha(img, px, py, pr, 245, 250, 255, 220, w, h)
-		}
-	}
-}
-
-// drawCircleAlpha draws a filled circle with alpha blending onto the image.
-func drawCircleAlpha(img *image.RGBA, cx, cy, r int, cr, cg, cb, ca uint8, W, H int) {
-	r2 := r * r
-	a := int(ca)
-	inv := 255 - a
-	for y := max(cy-r, 0); y <= min(cy+r, H-1); y++ {
-		off := y * img.Stride
-		for x := max(cx-r, 0); x <= min(cx+r, W-1); x++ {
-			dx, dy := x-cx, y-cy
-			if dx*dx+dy*dy <= r2 {
-				i := off + x*4
-				img.Pix[i] = uint8((a*int(cr) + inv*int(img.Pix[i])) / 255)
-				img.Pix[i+1] = uint8((a*int(cg) + inv*int(img.Pix[i+1])) / 255)
-				img.Pix[i+2] = uint8((a*int(cb) + inv*int(img.Pix[i+2])) / 255)
-				img.Pix[i+3] = 255
-			}
-		}
-	}
-}
-
-func drawPipe(img *image.RGBA, p Pipe, sx, sy float64, gndY, W, H int) {
-	x1 := int(p.x * sx)
-	x2 := int((p.x + pipeW) * sx)
-	topB := int((p.gapY - pipeGap/2) * sy)
-	botT := int((p.gapY + pipeGap/2) * sy)
-	capH := max(int(14*sy), 7)
-	cx1 := x1 - max(int(5*sx), 3)
-	cx2 := x2 + max(int(5*sx), 3)
-
-	fill := color.NRGBA{R: 80, G: 195, B: 78, A: 255}
-	edge := color.NRGBA{R: 50, G: 140, B: 45, A: 255}
-	cap1 := color.NRGBA{R: 65, G: 178, B: 63, A: 255}
-	cape := color.NRGBA{R: 40, G: 125, B: 38, A: 255}
-
-	drawRect(img, x1, 0, x2, topB-capH, fill, edge, W, H)
-	drawRect(img, cx1, topB-capH, cx2, topB, cap1, cape, W, H)
-	drawRect(img, x1, botT+capH, x2, gndY, fill, edge, W, H)
-	drawRect(img, cx1, botT, cx2, botT+capH, cap1, cape, W, H)
-
-	// Shine – a narrow bright strip near the left of each section to fake a
-	// cylindrical highlight. Two strips: a bright leading edge then a softer mid.
-	sw := max(int(3*sx), 2)
-	shx := x1 + max(int(3*sx), 2) // just inside the left dark edge
-	shcx := cx1 + max(int(3*sx), 2)
-	hi1 := color.NRGBA{R: 165, G: 235, B: 135, A: 255}
-	hi2 := color.NRGBA{R: 120, G: 215, B: 100, A: 255}
-
-	// Shaft shine
-	drawRect(img, shx, 0, shx+sw, topB-capH, hi1, hi1, W, H)
-	drawRect(img, shx+sw, 0, shx+sw*3, topB-capH, hi2, hi2, W, H)
-	drawRect(img, shx, botT+capH, shx+sw, gndY, hi1, hi1, W, H)
-	drawRect(img, shx+sw, botT+capH, shx+sw*3, gndY, hi2, hi2, W, H)
-	// Cap shine
-	drawRect(img, shcx, topB-capH, shcx+sw, topB, hi1, hi1, W, H)
-	drawRect(img, shcx+sw, topB-capH, shcx+sw*3, topB, hi2, hi2, W, H)
-	drawRect(img, shcx, botT, shcx+sw, botT+capH, hi1, hi1, W, H)
-	drawRect(img, shcx+sw, botT, shcx+sw*3, botT+capH, hi2, hi2, W, H)
-}
-
-func drawRect(img *image.RGBA, x1, y1, x2, y2 int, fill, edge color.NRGBA, W, H int) {
-	if x1 >= x2 || y1 >= y2 {
-		return
-	}
-	x1, y1 = max(x1, 0), max(y1, 0)
-	x2, y2 = min(x2, W), min(y2, H)
-	for y := y1; y < y2; y++ {
-		off := y * img.Stride
-		for x := x1; x < x2; x++ {
-			c := fill
-			if x == x1 || x == x2-1 {
-				c = edge
-			}
-			img.Pix[off+x*4], img.Pix[off+x*4+1], img.Pix[off+x*4+2], img.Pix[off+x*4+3] = c.R, c.G, c.B, c.A
-		}
-	}
-}
-
-func drawBird(img *image.RGBA, cx, cy, r int, _ float64, flapTimer int, W, H int) {
-	body := color.NRGBA{R: 99, G: 136, B: 168, A: 255}    // classic Go gopher blue-grey
-	snoutC := color.NRGBA{R: 185, G: 210, B: 220, A: 255} // lighter snout
-	pawC := color.NRGBA{R: 72, G: 105, B: 132, A: 255}    // slightly darker for paws
-	white := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-	dark := color.NRGBA{R: 15, G: 15, B: 15, A: 255}
-
-	flapping := flapTimer > 0
-
-	// Front paw – rises when flapping.
-	fpx := cx + r/3
-	fpy := cy + r*3/4
-	if flapping {
-		fpy = cy - r*3/4
-	}
-	drawPaw(img, fpx, fpy, r/3, pawC, flapping, W, H)
-
-	// Body.
-	drawCircle(img, cx, cy, r, body, W, H)
-
-	// Back paw – rises when flapping.
-	bpx := cx - r*2/3
-	bpy := cy + r*3/5
-	if flapping {
-		bpy = cy - r*3/5
-	}
-	drawPaw(img, bpx, bpy, r/3, pawC, flapping, W, H)
-
-	// Snout (right-forward).
-	snoutX := cx + r*3/5
-	snoutY := cy + r/6
-	snoutR := r * 2 / 5
-	drawCircle(img, snoutX, snoutY, snoutR, snoutC, W, H)
-
-	// Nose.
-	drawCircle(img, snoutX+snoutR/3, snoutY-snoutR/3, max(r/7, 2), dark, W, H)
-
-	// Teeth – two white rectangles below snout.
-	tw := r / 5
-	toothTop := snoutY + snoutR/2
-	toothBot := toothTop + r*2/5
-	drawRect(img, snoutX-tw-1, toothTop, snoutX-1, toothBot, white, white, W, H)
-	drawRect(img, snoutX+1, toothTop, snoutX+tw+1, toothBot, white, white, W, H)
-
-	// Eye (large white circle with pupil and shine).
-	// Pupil shifts upward when flapping.
-	eyeX := cx + r/4
-	eyeY := cy - r/4
-	pupilDY := 0
-	if flapping {
-		pupilDY = -3
-	}
-	drawCircle(img, eyeX, eyeY, r/3, white, W, H)
-	drawCircle(img, eyeX+r/8, eyeY+pupilDY/2, r/5, dark, W, H)
-	drawCircle(img, eyeX+r/8+3+pupilDY, eyeY+pupilDY, max(r/8, 1), white, W, H)
-}
-
-// drawPaw draws a small paw with three finger-nubs pointing up (flapping) or down (resting).
-func drawPaw(img *image.RGBA, cx, cy, r int, c color.NRGBA, flapping bool, W, H int) {
-	drawCircle(img, cx, cy, r, c, W, H)
-	fr := max(r/3, 2)
-	dir := 1 // nubs point down when resting
-	if flapping {
-		dir = -1 // nubs point up when flapping
-	}
-	drawCircle(img, cx-r/2, cy+dir*(r-fr/2), fr, c, W, H)
-	drawCircle(img, cx, cy+dir*r, fr, c, W, H)
-	drawCircle(img, cx+r/2, cy+dir*(r-fr/2), fr, c, W, H)
-}
-
-func drawCircle(img *image.RGBA, cx, cy, r int, c color.NRGBA, W, H int) {
-	r2 := r * r
-	for y := max(cy-r, 0); y <= min(cy+r, H-1); y++ {
-		off := y * img.Stride
-		for x := max(cx-r, 0); x <= min(cx+r, W-1); x++ {
-			dx, dy := x-cx, y-cy
-			if dx*dx+dy*dy <= r2 {
-				img.Pix[off+x*4], img.Pix[off+x*4+1], img.Pix[off+x*4+2], img.Pix[off+x*4+3] = c.R, c.G, c.B, c.A
-			}
 		}
 	}
 }
@@ -591,20 +327,7 @@ func (t *tapWidget) TypedKey(e *fyne.KeyEvent) {
 
 // ── Overlay (clouds + ground bar) ─────────────────────────────────────────────
 
-const (
-	numClouds     = 5
-	puffsPerCloud = 5
-)
-
-// cloudPuffs gives (dxFrac, dyFrac, rFrac) relative to the cloud centre.
-// Each puff circle's position = centre + offset*mainRadius.
-var cloudPuffs = [puffsPerCloud][3]float32{
-	{0, 0, 1},
-	{-2.0 / 3, 1.0 / 3, 2.0 / 3},
-	{2.0 / 3, 1.0 / 3, 2.0 / 3},
-	{-1.0 / 3, -1.0 / 5, 4.0 / 5},
-	{1.0 / 3, -1.0 / 5, 4.0 / 5},
-}
+const numClouds = 5
 
 type cloudSpec struct{ baseX, baseY, radius, speed float32 }
 

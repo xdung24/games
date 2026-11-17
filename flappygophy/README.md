@@ -16,10 +16,11 @@ Best scores are saved when a round ends. Audio uses the launcher's shared device
 
 ## Web performance
 
-The sky and ground are cached, and frames reuse an opaque RGBA buffer that Fyne
-can upload without allocating and converting another image. Browser rendering
-is capped at the logical 400x600 resolution (preserving the viewport's aspect
-ratio), then smoothly scaled by the GPU; text and controls remain full resolution.
-Native builds retain full-resolution rendering. Physics, update timing, and input
-behavior are unchanged.
+Like Flappy Chick, the game moves reusable scene objects rather than repainting
+a full-screen bitmap. Gopher poses and clouds use cached SVG artwork rendered
+at the display's resolution. The sky and pipes use gradients, and the detailed
+ground texture is generated only when its size changes. There is no low-resolution
+web rendering cap. Physics, update timing, and input behavior are unchanged.
+Like Flappy Chick, title, paused, and game-over screens stop continuous rendering
+until input or resizing requires an update. Clouds move during active play.
 Use the release WebAssembly build described in the root README for gameplay.

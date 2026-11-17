@@ -4,100 +4,164 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
+	"math"
 	"testing"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/test"
 )
 
-func BenchmarkDrawFrame(b *testing.B) {
+func BenchmarkSceneRefresh(b *testing.B) {
 	a := test.NewApp()
 	defer a.Quit()
 	for _, size := range [][2]int{{400, 600}, {1200, 1800}, {1920, 1080}} {
-		for _, web := range []bool{false, true} {
-			b.Run(fmt.Sprintf("%dx%d/web=%t", size[0], size[1], web), func(b *testing.B) {
-				g := NewGame(a.Preferences())
-				g.state = StatePlaying
-				g.pipes = []Pipe{{x: 180, gapY: 280}, {x: 350, gapY: 220}}
-				draw := g.drawFrame
-				if web {
-					draw = g.drawWebFrame
-				}
-				draw(size[0], size[1])
-				b.ReportAllocs()
-				b.ResetTimer()
-				for b.Loop() {
-					draw(size[0], size[1])
-				}
-			})
-		}
+		b.Run(fmt.Sprintf("%dx%d", size[0], size[1]), func(b *testing.B) {
+			g := NewGame(a.Preferences())
+			g.state = StatePlaying
+			g.pipes = []Pipe{{x: 180, gapY: 280}, {x: 350, gapY: 220}}
+			scene := newGameScene(g)
+			scene.Resize(fyne.NewSize(float32(size[0]), float32(size[1])))
+			now := time.Unix(0, 0)
+			scene.refresh(now)
+			b.ReportAllocs()
+			for b.Loop() {
+				g.birdY = 601 - g.birdY
+				g.pipes[0].x = 361 - g.pipes[0].x
+				now = now.Add(time.Second / 60)
+				scene.refresh(now)
+			}
+		})
 	}
 }
 
-func TestWebRasterResolution(t *testing.T) {
-	a := test.NewApp()
-	defer a.Quit()
-	g := NewGame(a.Preferences())
-	for _, size := range []struct {
-		w, h, wantW, wantH int
-	}{
-		{400, 600, 400, 600},
-		{1200, 1800, 400, 600},
-		{1170, 2532, 277, 600},
-		{1920, 1080, 400, 225},
-		{200, 300, 200, 300},
-	} {
-		got := g.drawWebFrame(size.w, size.h).Bounds()
-		if got != image.Rect(0, 0, size.wantW, size.wantH) {
-			t.Errorf("web frame %dx%d: got %v, want %dx%d", size.w, size.h, got, size.wantW, size.wantH)
-		}
-	}
-	if got := g.drawFrame(800, 600).Bounds(); got != image.Rect(0, 0, 800, 600) {
-		t.Fatalf("native rendering must retain full resolution, got %v", got)
-	}
-}
-
-func TestDrawFrameReusesBufferWithoutTrails(t *testing.T) {
+func TestSceneMovesSpritesWithoutResizingOrReplacingTextures(t *testing.T) {
 	a := test.NewApp()
 	defer a.Quit()
 	g := NewGame(a.Preferences())
 	g.state = StatePlaying
 	g.pipes = []Pipe{{x: 180, gapY: 280}}
-	first := g.drawFrame(200, 300)
-	frame, ok := first.(*image.RGBA)
-	if !ok {
-		t.Fatal("frames must be RGBA for direct upload without a Fyne image conversion")
-	}
-	for i := 3; i < len(frame.Pix); i += 4 {
-		if frame.Pix[i] != 255 {
-			t.Fatal("directly painted RGBA frames must remain opaque")
-		}
-	}
-	background := g.background
-	for _, point := range []image.Point{{40, 150}, {95, 80}} {
-		if first.At(point.X, point.Y) == background.At(point.X, point.Y) {
-			t.Fatalf("expected a bird or pipe at %v before moving", point)
-		}
-	}
+	scene := newGameScene(g)
+	scene.Resize(fyne.NewSize(400, 600))
+	scene.refresh(time.Unix(0, 0))
+	objects := append([]fyne.CanvasObject(nil), scene.objects...)
+	pipeSize, pipeTexture := scene.pipes[0][0].edge.Size(), scene.pipes[0][0].fill
+	gopherTexture := scene.gopher[0].Resource
 	g.birdY = 420
-	g.pipes = nil
-	second := g.drawFrame(200, 300)
-	if first != second || g.background != background {
-		t.Fatal("unchanged dimensions must reuse the frame and static background")
+	g.pipes[0].x = -20
+	g.flapTimer = 20
+	scene.refresh(time.Unix(1, 0))
+	if scene.pipes[0][0].edge.Position().X != -20 || scene.pipes[0][0].edge.Size() != pipeSize ||
+		scene.pipes[0][0].fill != pipeTexture {
+		t.Fatal("moving offscreen must clip the pipe without resizing or replacing its texture")
 	}
-	for _, point := range []image.Point{{40, 150}, {95, 80}} {
-		if second.At(point.X, point.Y) != background.At(point.X, point.Y) {
-			t.Fatalf("moving objects must not leave a trail at %v", point)
+	if scene.gopher[0].Visible() || !scene.gopher[1].Visible() ||
+		scene.gopher[1].Position() != fyne.NewPos(48, 388) {
+		t.Fatal("flapping must move the gopher and select its cached raised-paw pose")
+	}
+	g.flapTimer = 0
+	g.pipes = nil
+	scene.refresh(time.Unix(2, 0))
+	if !scene.gopher[0].Visible() || scene.gopher[0].Resource != gopherTexture {
+		t.Fatal("the resting pose must reuse its original texture")
+	}
+	for _, parts := range scene.pipes {
+		for _, part := range parts {
+			if part.edge.Visible() || part.fill.Visible() {
+				t.Fatal("removed pipes must not leave stale sprites on screen")
+			}
 		}
 	}
-	if second.At(40, 210) == background.At(40, 210) {
-		t.Fatal("the bird must appear at its new position")
+	for i, object := range objects {
+		if scene.objects[i] != object {
+			t.Fatal("animation must reuse the existing scene objects")
+		}
 	}
-	g.drawFrame(300, 200)
-	if g.background == background || g.frameImage.Bounds() != image.Rect(0, 0, 300, 200) {
-		t.Fatal("resizing must rebuild the cached images")
+}
+
+func TestSceneResizeKeepsGeometryAndFullResolutionDetail(t *testing.T) {
+	a := test.NewApp()
+	defer a.Quit()
+	g := NewGame(a.Preferences())
+	g.state = StatePlaying
+	g.pipes = []Pipe{{x: 180, gapY: 280}}
+	scene := newGameScene(g)
+	closeTo := func(got, want float32) bool { return math.Abs(float64(got-want)) < 0.001 }
+	for _, size := range []fyne.Size{fyne.NewSize(400, 600), fyne.NewSize(1200, 1800), fyne.NewSize(1920, 1080)} {
+		scene.Resize(size)
+		scene.refresh(time.Unix(0, 0))
+		sx, sy := size.Width/gameW, size.Height/gameH
+		diameter := 64 * min(sx, sy)
+		pose := scene.gopher[0]
+		if !closeTo(pose.Size().Width, diameter) || !closeTo(pose.Size().Height, diameter) ||
+			!closeTo(pose.Position().X+diameter/2, birdX*sx) ||
+			!closeTo(pose.Position().Y+diameter/2, 300*sy) {
+			t.Fatalf("gopher proportions or position changed at %v", size)
+		}
+		top, cap := scene.pipes[0][0].edge, scene.pipes[0][1].edge
+		if !closeTo(top.Size().Width, pipeW*sx) || !closeTo(top.Size().Height, 186*sy) ||
+			!closeTo(cap.Position().Y+cap.Size().Height, 200*sy) ||
+			!closeTo(scene.ground.Position().Y, (gameH-groundH)*sy) {
+			t.Fatalf("pipe gaps and ground must match the simulation at %v", size)
+		}
+	}
+	if bounds := scene.ground.Generator(1200, 210).Bounds(); bounds != image.Rect(0, 0, 1200, 210) {
+		t.Fatalf("ground detail must retain the requested display resolution, got %v", bounds)
+	}
+}
+
+func TestGopherArtworkIsCenteredAndUnclipped(t *testing.T) {
+	a := test.NewApp()
+	defer a.Quit()
+	for _, resource := range []fyne.Resource{gopherRest, gopherFlap} {
+		pose := canvas.NewImageFromResource(resource)
+		w := test.NewWindow(pose)
+		w.SetPadded(false)
+		w.Resize(fyne.NewSize(256, 256))
+		pose.Refresh()
+		if pose.Image == nil {
+			t.Fatalf("%s did not render", resource.Name())
+		}
+		bounds := pose.Image.Bounds()
+		center := color.NRGBAModel.Convert(pose.Image.At(bounds.Dx()/2, bounds.Dy()/2))
+		if center != (color.NRGBA{R: 99, G: 136, B: 168, A: 255}) {
+			t.Fatalf("%s must center the full gopher body, got %v", resource.Name(), center)
+		}
+		for y := 0; y < bounds.Dy(); y++ {
+			for _, x := range []int{0, bounds.Dx() - 1} {
+				if _, _, _, alpha := pose.Image.At(x, y).RGBA(); alpha != 0 {
+					t.Fatalf("%s is clipped against an image edge", resource.Name())
+				}
+			}
+		}
+		w.Close()
+	}
+}
+
+func TestUpdateRequestsRenderingOnlyWhenPlaying(t *testing.T) {
+	a := test.NewApp()
+	defer a.Quit()
+	for _, state := range []State{StateStart, StatePaused, StateOver} {
+		g := NewGame(a.Preferences())
+		g.state = state
+		if g.update() || g.frame != 0 || g.birdY != gameH/2 {
+			t.Fatalf("idle state %v must not advance or request a redraw", state)
+		}
+	}
+	g := NewGame(a.Preferences())
+	g.state = StatePlaying
+	if !g.update() || g.frame != 1 {
+		t.Fatal("playing must advance physics and request a redraw")
+	}
+	g.birdY = gameH - groundH
+	if !g.update() || g.state != StateOver {
+		t.Fatal("the collision frame must redraw the final position and game-over state")
+	}
+	if g.update() {
+		t.Fatal("game-over must stop continuous rendering after the final frame")
 	}
 }
 

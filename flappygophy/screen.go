@@ -16,6 +16,7 @@ import (
 type Screen struct {
 	window            fyne.Window
 	game              *Game
+	scene             *gameScene
 	input             *tapWidget
 	content           *fyne.Container
 	textBox           *fyne.Container
@@ -36,8 +37,9 @@ func NewScreen(w fyne.Window, preferences fyne.Preferences, onBack func()) *Scre
 				if !s.content.Visible() {
 					return
 				}
-				s.game.update()
-				s.refresh()
+				if s.game.update() {
+					s.refresh()
+				}
 			})
 		}
 	}()
@@ -46,6 +48,7 @@ func NewScreen(w fyne.Window, preferences fyne.Preferences, onBack func()) *Scre
 
 func newScreen(w fyne.Window, g *Game, onBack func()) *Screen {
 	s := &Screen{window: w, game: g, lastState: State(-1), lastScore: -1, lastHi: -1}
+	s.scene = newGameScene(g)
 	s.input = newTapWidget(func() {
 		g.flap()
 		s.refresh()
@@ -71,7 +74,7 @@ func newScreen(w fyne.Window, g *Game, onBack func()) *Screen {
 	top := container.New(layout.NewCustomPaddedLayout(10, 0, 0, 0), container.NewCenter(s.textBox))
 	bottom := container.NewPadded(container.NewHBox(s.back, layout.NewSpacer(), s.pause))
 	s.content = container.NewStack(
-		container.New(outOfSafeLayout(w), g.raster),
+		container.New(outOfSafeLayout(w), container.NewClip(s.scene)),
 		s.input,
 		container.NewBorder(top, bottom, nil, nil),
 		container.NewCenter(container.NewVBox(g.msgText, g.subText)),
@@ -148,5 +151,5 @@ func (s *Screen) refresh() {
 			s.pause.Disable()
 		}
 	}
-	g.raster.Refresh()
+	s.scene.refresh(time.Now())
 }
