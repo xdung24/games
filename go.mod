@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	fyne.io/fyne/v2 v2.8.0
-	github.com/HugoSmits86/nativewebp v1.3.0
 	github.com/ebitengine/oto/v3 v3.3.3
 	golang.org/x/image v0.45.0
 )
