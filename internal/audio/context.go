@@ -1,14 +1,14 @@
 package audio
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ebitengine/oto/v3"
 )
 
-// Context opens one CD-quality mono device shared by all games.
+// Context opens one CD-quality mono device shared by all games. On the web,
+// Oto becomes ready after the browser receives a user gesture.
 var Context = sync.OnceValues(func() (*oto.Context, error) {
 	ctx, ready, err := oto.NewContext(&oto.NewContextOptions{
 		SampleRate:   44100,
@@ -19,10 +19,8 @@ var Context = sync.OnceValues(func() (*oto.Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	select {
-	case <-ready:
-		return ctx, nil
-	case <-time.After(2 * time.Second):
-		return nil, fmt.Errorf("audio device was not ready within 2 seconds")
+	if err := waitReady(ready); err != nil {
+		return nil, err
 	}
+	return ctx, nil
 })
