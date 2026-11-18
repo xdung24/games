@@ -30,6 +30,11 @@ dependency versions declared in [go.mod](../go.mod).
 - [internal/navigation/](../internal/navigation): shared double-Esc handling.
 - [internal/touchcontrols/](../internal/touchcontrols): Go/Fyne SVG buttons,
   held-touch tracking, game-screen layout, and platform pointer translation.
+- [internal/sprite/](../internal/sprite): sprite-sheet engine that loads
+  `cmd/spritesheet` JSON + image, looks up frames by name, plays clips, and
+  draws scaled/mirrored frames.
+- [cmd/spritesheet/](../cmd/spritesheet): CLI that slices grid sprite sheets
+  into a transparent PNG/WebP atlas plus JSON frame metadata.
 - [index.html](../index.html): full-window iframe loading `web/index.html`.
 - [web/](../web): checked-in loading shell and browser-only zoom/keyboard
   protections. `mobile.js` must not implement gameplay; only WASM is generated.
@@ -172,6 +177,26 @@ dependency versions declared in [go.mod](../go.mod).
   generated WASM binary. Preserve the iframe's relative URL, autoplay
   permission, and mobile input protections. Do not replace the custom web
   shell with Fyne-generated HTML without retaining these integrations.
+
+## Sprite sheets
+
+- Generate raster sprite sheets with [cmd/spritesheet](../cmd/spritesheet)
+  and load them with `internal/sprite`. Do not hard-code grid sizes, row
+  indexes or frame counts in game code, and do not scan pixels at runtime to
+  find sprite bounds; use the JSON's frame names, animation lists and `trim`.
+- Embed **JSON + WebP** (lossless) in a game's `assets/`. WebP is about 40%
+  smaller than PNG with identical pixels and decodes no slower; embedded
+  images go straight into the WASM download and gzip barely shrinks either
+  format. Do not embed a PNG copy of the same sheet.
+- Keep PNG copies and original source sheets under `resources/` for editing.
+  `sprite.Load` uses the first image in the JSON's `images` list that exists,
+  so the embedded PNG can be omitted without code changes.
+- Select animations by name (for example `sheet.Clip("walk", 0, 0, 0.085,
+  true)`) and stand sprites on the floor with `Frame.BottomPadding()`.
+  Load sheets lazily, as Kung Fu Master does with `sync.OnceValue`, so other
+  games do not pay the decode cost at launcher startup.
+- Document the exact `cmd/spritesheet` command used to regenerate a game's
+  sheet in that game's README.
 
 ## Adding a game
 

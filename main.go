@@ -254,7 +254,7 @@ func gamesForPlatform(entries []gameEntry, targetOS string) []gameEntry {
 }
 
 func main() {
-	a := app.NewWithID("com.dungle.game")
+	a := app.NewWithID("com.dungle.retrogames")
 	a.Settings().SetTheme(brickbreaker.NewTheme())
 	w := a.NewWindow("game-window")
 	w.SetPadded(false)
